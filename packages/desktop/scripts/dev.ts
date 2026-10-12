@@ -35,6 +35,18 @@ async function main() {
 }
 
 async function focusDesktop() {
+  // While Vite is building there is no Electron owner yet. A second Electron could otherwise
+  // claim its lock and load an older bundle without the development renderer URL.
+  const ready = await fetch(
+    `http://127.0.0.1:${process.env.AMON_DESKTOP_REMOTE_DEBUGGING_PORT ?? "9222"}/json/version`,
+    {
+      signal: AbortSignal.timeout(1000),
+    },
+  ).then(
+    (response) => response.ok,
+    () => false,
+  )
+  if (!ready) return
   if (!(await Bun.file(join(import.meta.dirname, "../out/main/index.js")).exists())) return
   const { default: electron } = await import("electron")
   await Bun.spawn([process.env.ELECTRON_EXEC_PATH ?? electron, join(import.meta.dirname, "../out/main/index.js")], {

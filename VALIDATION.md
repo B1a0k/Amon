@@ -30,3 +30,20 @@
 本地构建并运行验证 Windows x64。GitHub Actions 配置覆盖 Windows、Linux、macOS 的 x64/ARM64；Windows ARM64 使用交叉编译，其引擎不在 x64 runner 上执行。跨平台 CI 的实际结果需看对应运行记录，不能将配置检查算作平台运行通过。WSL/SSH 远程引擎在 .amon 下隔离安装，尚未执行完整远程运行验证。发布签名和自动更新服务需要配置自己的凭据及 AMON_UPDATE_URL。
 
 新增验证：重复运行 npm run dev 正常聚焦已有窗口，Vite 仍只有 5173，开发引擎使用独立动态端口；桌面入口、打包与依赖过滤 10 项合约通过。推理折叠的组件测试在修复前复现 Solid 生命周期警告，修复后 13 项全部通过。生产时间线基准在相同 100 回合历史、30 个增量、30 倍 CPU 节流条件下均通过，前后均无行替换、空白采样或底部漂移；单次时序存在噪声，不作为提速结论。
+
+## GitHub Actions 实测结果
+
+2026-10-12 完成六目标构建。为避免浪费已通过的平台，macOS 签名空变量修复后只重跑 macOS；Windows/Linux 复用此前有效结果。
+
+| 平台 | 构建、打包与上传 | 引擎运行 |
+| --- | --- | --- |
+| Windows x64 | 通过，NSIS | 原生生命周期测试通过 |
+| Windows ARM64 | 通过，NSIS | 在 x64 runner 上交叉编译，未原生运行 |
+| Linux x64 | 通过，AppImage/deb/rpm | 原生生命周期测试通过 |
+| Linux ARM64 | 通过，AppImage/deb/rpm | 原生生命周期测试通过 |
+| macOS Intel x64 | 通过，dmg/zip | 原生生命周期测试通过 |
+| macOS Apple Silicon ARM64 | 通过，dmg/zip | 原生生命周期测试通过 |
+
+Windows/Linux：[构建记录及 Artifacts](https://github.com/B1a0k/Amon/actions/runs/38266515566)。macOS：[修复后重跑及 Artifacts](https://github.com/B1a0k/Amon/actions/runs/38268511511)。测试覆盖编译引擎的选举、认证、嵌入网页、插件重载、停止和登记文件清理。跨平台运行测试覆盖本地引擎，不等于在 Linux/macOS 人工操作过完整桌面窗口。
+
+CI 使用无开发者证书的测试打包配置，没有创建或发布 Release。macOS Apple Silicon 使用构建工具的 ad-hoc 签名；正式分发签名与公证须配置自己的证书。修复了 Linux checkout 的链接文件模式、新 npm 暂缓 Bun 安装脚本、跨架构 Electron 分发选择及空签名变量的问题。失败 runner 均已结束。
