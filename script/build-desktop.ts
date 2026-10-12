@@ -11,6 +11,11 @@ process.env.AMON_VERSION ??= pkg.version
 process.env.AMON_CLI_DIST = path.join(root, "packages/cli/dist")
 process.env.AMON_CLI_TARGET = target.target
 
+// An unset Actions secret becomes an empty environment value. electron-builder treats empty
+// certificate paths as the working directory, so omit credentials that were not configured.
+for (const key of ["CSC_LINK", "CSC_KEY_PASSWORD", "APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_TEAM_ID"])
+  if (process.env[key] === "") delete process.env[key]
+
 await $`bun run script/build.ts ${`--target=${target.package.replace("@opencode/cli", "opencode")}`} --skip-install`.cwd(
   path.join(root, "packages/cli"),
 )
