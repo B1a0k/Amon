@@ -47,7 +47,7 @@ Windows x64 安装包：packages/desktop/dist/amon-desktop-win-x64.exe。免安�
 
 包含 21 个工作区包：桌面与前端、本地引擎、Server、Client、Protocol、Schema、Plugin、UI、Session UI 与它们的构建依赖。终端交互前端通过 sparse-checkout 排除，规则记录于 SOURCE_SCOPE.txt。Windows 的图标与类型声明符号链接占位文件已替换为实际内容。
 
-上游：anomalyco/opencode 的 dev 分支，提交 773d8621d6bcd311067b225d837c917b3e83573e，版本 2.0.27。本地分支 amon；origin 指向上游。Git 使用浅层按需拉取，未下载完整历史。同步时应保留 Amon 的入口、标识和目录隔离改动。
+上游：anomalyco/opencode 的 dev 分支，提交 773d8621d6bcd311067b225d837c917b3e83573e，版本 2.0.27。Amon 仓库以筛选后的桌面源码快照建立，不包含 TUI、其他产品和上游活动工作流。本地默认分支 dev，origin 指向 B1a0k/Amon；上游浅层历史保留在 upstream remote 与 opencode-upstream 分支。同步时应保留 Amon 的入口、标识和目录隔离改动。
 
 保留 MIT 许可证和版权声明；Amon 不是 OpenCode 官方产品。原始说明在 README.upstream.md 和 README.zh.upstream.md，原始发布工作流在 .github/upstream-publish.yml，不自动执行。验证范围见 [VALIDATION.md](VALIDATION.md)。
 

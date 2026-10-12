@@ -26,4 +26,4 @@ The **Amon desktop** GitHub Actions workflow builds Windows, Linux and macOS pac
 
 Repeated `npm run dev` focuses the existing development window. Each isolated development profile uses an available port, while production retains its managed background service.
 
-See [branding](AMON_BRANDING.md), [validation](VALIDATION.md) and [source rules](SOURCE_SCOPE.txt). Upstream revision: 773d8621d6bcd311067b225d837c917b3e83573e on dev, version 2.0.27. The checkout uses shallow filtered history and sparse source selection. Original documentation and the MIT license are preserved. Amon is an independent fork.
+See [branding](AMON_BRANDING.md), [validation](VALIDATION.md) and [source rules](SOURCE_SCOPE.txt). Upstream revision: 773d8621d6bcd311067b225d837c917b3e83573e on dev, version 2.0.27. The Amon repository starts from a desktop source snapshot, excluding the TUI, other products and active upstream workflows. Local upstream history remains available through the upstream remote. Original documentation and the MIT license are preserved. Amon is an independent fork.

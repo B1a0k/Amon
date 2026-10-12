@@ -74,6 +74,7 @@ jobs:
       - run: bun run check
 
   build:
+    name: ${{ matrix.name }}
     needs: [version, check]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
