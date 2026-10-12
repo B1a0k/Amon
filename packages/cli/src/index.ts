@@ -1,0 +1,105 @@
+#!/usr/bin/env bun
+
+import { ensurePluginRuntime } from "@opencode/plugin/runtime"
+import { NodeRuntime, NodeServices } from "@effect/platform-node"
+import { Cause, Effect } from "effect"
+import { getErrorReported } from "effect/Runtime"
+import { Commands } from "./commands/commands"
+import { Runtime } from "./framework/runtime"
+import { Observability } from "@opencode/util/observability"
+import { AMON_ARTIFACT, AMON_CHANNEL, AMON_LOCAL, AMON_VERSION } from "./version"
+import { LayerNode } from "@opencode/util/effect/layer-node"
+import { Global } from "@opencode/util/global"
+import { AppProcess } from "@opencode/util/process"
+import { Npm } from "@opencode/util/npm"
+import { EffectFlock } from "@opencode/util/effect-flock"
+import { Heap } from "./heap"
+import { CpuProfile } from "./cpu-profile"
+
+ensurePluginRuntime()
+
+if (process.env.AMON_SSH_ASKPASS_PORT) {
+  const { askpass } = await import("./ssh-askpass")
+  process.exit(await Effect.runPromise(askpass.pipe(Effect.provide(NodeServices.layer))))
+}
+
+const Handlers = Runtime.handlers(Commands, {
+  service: {
+    start: () => import("./commands/handlers/service/start"),
+    restart: () => import("./commands/handlers/service/restart"),
+    status: () => import("./commands/handlers/service/status"),
+    stop: () => import("./commands/handlers/service/stop"),
+    get: () => import("./commands/handlers/service/get"),
+    set: () => import("./commands/handlers/service/set"),
+    unset: () => import("./commands/handlers/service/unset"),
+  },
+  pair: () => import("./commands/handlers/pair"),
+  serve: () => import("./commands/handlers/serve"),
+})
+
+Effect.gen(function* () {
+  yield* Heap.listen
+  yield* CpuProfile.listen
+  const runFork = Effect.runForkWith(yield* Effect.context<never>())
+  const uncaughtException = (cause: Error, origin: "uncaughtException" | "unhandledRejection") => {
+    runFork(Effect.logError("uncaught exception", { cause, origin }))
+  }
+  const unhandledRejection = (cause: unknown) => {
+    runFork(Effect.logError("unhandled rejection", { cause }))
+  }
+  process.on("uncaughtException", uncaughtException)
+  process.on("unhandledRejection", unhandledRejection)
+  yield* Effect.addFinalizer(() =>
+    Effect.sync(() => {
+      process.off("uncaughtException", uncaughtException)
+      process.off("unhandledRejection", unhandledRejection)
+    }),
+  )
+  yield* Effect.logInfo("cli starting", {
+    version: AMON_VERSION,
+    channel: AMON_CHANNEL,
+    local: AMON_LOCAL,
+    args: process.argv.slice(2),
+  })
+  return yield* Runtime.run(Commands, Handlers, { version: AMON_VERSION })
+}).pipe(
+  Effect.catchCause((cause) =>
+    Effect.logError("cli process failed", {
+      cause,
+      args: process.argv.slice(2),
+    }).pipe(Effect.andThen(Effect.failCause(cause))),
+  ),
+  Effect.annotateLogs({ role: "cli" }),
+  Effect.provide(
+    LayerNode.compile(LayerNode.group([Global.node, AppProcess.node, Npm.node, EffectFlock.node]), {
+      replacements: [
+        Global.node.replace(
+          Global.layerWith(process.env.AMON_CONFIG_DIR ? { config: process.env.AMON_CONFIG_DIR } : {}),
+        ),
+      ],
+    }),
+  ),
+  Effect.provide(
+    Observability.layer({
+      endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+      headers: process.env.OTEL_EXPORTER_OTLP_HEADERS,
+      client: process.env.AMON_CLIENT ?? AMON_ARTIFACT,
+      version: AMON_VERSION,
+      channel: AMON_CHANNEL,
+    }),
+  ),
+  Effect.provide(NodeServices.layer),
+  Effect.scoped,
+  Effect.tap(() => Effect.sync(() => process.exit(process.exitCode ?? 0))),
+  // runMain's default reporter logs the fatal cause to stdout. Write it to stderr instead: the
+  // desktop and `Service.ensure` only capture stderr from `serve --service`, so this is the only
+  // channel through which a startup failure's reason reaches the user.
+  Effect.tapCause((cause) =>
+    Effect.sync(() => {
+      if (Cause.hasInterruptsOnly(cause)) return
+      if (!getErrorReported(Cause.squash(cause))) return
+      process.stderr.write(Cause.pretty(cause) + "\n")
+    }),
+  ),
+  NodeRuntime.runMain({ disableErrorReporting: true }),
+)

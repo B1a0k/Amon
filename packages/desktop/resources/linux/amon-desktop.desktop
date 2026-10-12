@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Amon
+Exec=/opt/Amon/ai.amon.desktop %U
+Terminal=false
+Type=Application
+Icon=ai.amon.desktop
+StartupWMClass=ai.amon.desktop
+NoDisplay=true
+Comment=Open source AI coding agent
+Categories=Development;
