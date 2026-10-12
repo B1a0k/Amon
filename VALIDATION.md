@@ -46,4 +46,4 @@
 
 Windows/Linux：[构建记录及 Artifacts](https://github.com/B1a0k/Amon/actions/runs/38266515566)。macOS：[修复后重跑及 Artifacts](https://github.com/B1a0k/Amon/actions/runs/38268511511)。测试覆盖编译引擎的选举、认证、嵌入网页、插件重载、停止和登记文件清理。跨平台运行测试覆盖本地引擎，不等于在 Linux/macOS 人工操作过完整桌面窗口。
 
-CI 使用无开发者证书的测试打包配置，没有创建或发布 Release。macOS Apple Silicon 使用构建工具的 ad-hoc 签名；正式分发签名与公证须配置自己的证书。修复了 Linux checkout 的链接文件模式、新 npm 暂缓 Bun 安装脚本、跨架构 Electron 分发选择及空签名变量的问题。失败 runner 均已结束。
+CI 使用无开发者证书的测试打包配置，没有创建或发布 Release。macOS 桌面包尚未执行开发者签名与公证，正式分发须配置自己的证书；不能将引擎运行测试当作完整桌面启动测试。修复了 Linux checkout 的链接文件模式、新 npm 暂缓 Bun 安装脚本、跨架构 Electron 分发选择及空签名变量的问题。失败 runner 均已结束。
