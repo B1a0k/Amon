@@ -26,6 +26,7 @@
   "workspaces": {
     "packages": [
       "packages/ai",
+      "packages/amon-native",
       "packages/app",
       "packages/cli",
       "packages/client",

@@ -1574,6 +1574,145 @@ export interface IntegrationApi<E = never> {
   }
 }
 
+export type BeaconpassGetInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type BeaconpassGetOutput = {
+  readonly location: Location.PublicRef
+  readonly data: {
+    readonly engine: {
+      readonly available: boolean
+      readonly name: string
+      readonly version: string
+      readonly target: string
+      readonly error?: string | undefined
+      readonly capabilities: ReadonlyArray<"inspect_pe" | "convert_pe">
+    }
+    readonly jobs: ReadonlyArray<{
+      readonly id: string
+      readonly operation: "inspect_pe" | "convert_pe"
+      readonly status: "running" | "succeeded" | "failed"
+      readonly source:
+        | { readonly type: "manual" }
+        | {
+            readonly type: "agent"
+            readonly sessionID: Session.ID
+            readonly messageID: SessionMessage.ID
+            readonly toolCallID: string
+          }
+      readonly inputPath: string
+      readonly outputPath?: string | undefined
+      readonly stubPath?: string | undefined
+      readonly scheme?: "1" | "2" | undefined
+      readonly format?: "binary" | "hex" | "c" | undefined
+      readonly architecture?: "x86" | "x64" | undefined
+      readonly artifactID?: string | undefined
+      readonly error?: string | undefined
+      readonly createdAt: number
+      readonly completedAt?: number | undefined
+    }>
+    readonly artifacts: ReadonlyArray<{
+      readonly id: string
+      readonly jobID: string
+      readonly kind: "shellcode" | "report"
+      readonly name: string
+      readonly path: string
+      readonly mediaType: string
+      readonly size: number
+      readonly sha256: string
+      readonly createdAt: number
+    }>
+  }
+}
+export type BeaconpassGetOperation<E = never> = (input?: BeaconpassGetInput) => Effect.Effect<BeaconpassGetOutput, E>
+
+export type BeaconpassInspectInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly path: string
+}
+export type BeaconpassInspectOutput = {
+  readonly location: Location.PublicRef
+  readonly data: {
+    readonly path: string
+    readonly architecture: "x86" | "x64"
+    readonly entrypoint: number
+    readonly imageBase: string
+    readonly sectionAlignment: number
+    readonly fileAlignment: number
+    readonly imageSize: number
+    readonly headerSize: number
+    readonly hasRelocations: boolean
+    readonly hasTls: boolean
+    readonly isDotNet: boolean
+    readonly overlaySize: number
+    readonly sections: ReadonlyArray<{
+      readonly name: string
+      readonly virtualAddress: number
+      readonly virtualSize: number
+      readonly rawOffset: number
+      readonly rawSize: number
+    }>
+  }
+}
+export type BeaconpassInspectOperation<E = never> = (
+  input: BeaconpassInspectInput,
+) => Effect.Effect<BeaconpassInspectOutput, E>
+
+export type BeaconpassConvertInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly path: string
+  readonly stubPath?: string
+  readonly scheme?: "1" | "2"
+  readonly format?: "binary" | "hex" | "c"
+  readonly outputPath?: string
+}
+export type BeaconpassConvertOutput = {
+  readonly location: Location.PublicRef
+  readonly data: {
+    readonly job: {
+      readonly id: string
+      readonly operation: "inspect_pe" | "convert_pe"
+      readonly status: "running" | "succeeded" | "failed"
+      readonly source:
+        | { readonly type: "manual" }
+        | {
+            readonly type: "agent"
+            readonly sessionID: Session.ID
+            readonly messageID: SessionMessage.ID
+            readonly toolCallID: string
+          }
+      readonly inputPath: string
+      readonly outputPath?: string | undefined
+      readonly stubPath?: string | undefined
+      readonly scheme?: "1" | "2" | undefined
+      readonly format?: "binary" | "hex" | "c" | undefined
+      readonly architecture?: "x86" | "x64" | undefined
+      readonly artifactID?: string | undefined
+      readonly error?: string | undefined
+      readonly createdAt: number
+      readonly completedAt?: number | undefined
+    }
+    readonly artifact: {
+      readonly id: string
+      readonly jobID: string
+      readonly kind: "shellcode" | "report"
+      readonly name: string
+      readonly path: string
+      readonly mediaType: string
+      readonly size: number
+      readonly sha256: string
+      readonly createdAt: number
+    }
+  }
+}
+export type BeaconpassConvertOperation<E = never> = (
+  input: BeaconpassConvertInput,
+) => Effect.Effect<BeaconpassConvertOutput, E>
+
+export interface BeaconpassApi<E = never> {
+  readonly get: BeaconpassGetOperation<E>
+  readonly inspect: BeaconpassInspectOperation<E>
+  readonly convert: BeaconpassConvertOperation<E>
+}
+
 export type McpListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
 export type McpListOutput = { readonly location: Location.PublicRef; readonly data: ReadonlyArray<Mcp.Server> }
 export type McpListOperation<E = never> = (input?: McpListInput) => Effect.Effect<McpListOutput, E>
@@ -1661,6 +1800,234 @@ export interface CredentialApi<E = never> {
   readonly update: CredentialUpdateOperation<E>
   readonly activate: CredentialActivateOperation<E>
   readonly remove: CredentialRemoveOperation<E>
+}
+
+export type OperationGetInput = { readonly sessionID: Session.ID }
+export type OperationGetOutput = {
+  readonly schemaVersion: 1
+  readonly operation: {
+    readonly schemaVersion: 2
+    readonly engagementId: string
+    readonly revision: number
+    readonly assets: ReadonlyArray<{
+      readonly id: string
+      readonly evidence: ReadonlyArray<string>
+      readonly createdAt: number
+      readonly updatedAt: number
+      readonly kind: "host" | "device" | "domain" | "application" | "network" | "unknown"
+      readonly displayName: string
+      readonly identifiers: ReadonlyArray<{ readonly kind: string; readonly value: string }>
+      readonly scopeId?: string | undefined
+      readonly zone?: string | undefined
+      readonly parentAssetId?: string | undefined
+      readonly membershipState?: "observed" | "confirmed" | "disproved" | "stale" | undefined
+      readonly membershipRationale?: string | undefined
+      readonly role?: string | undefined
+      readonly os?: string | undefined
+      readonly state: "observed" | "confirmed" | "stale" | "retired" | "conflicted"
+    }>
+    readonly services: ReadonlyArray<{
+      readonly id: string
+      readonly evidence: ReadonlyArray<string>
+      readonly createdAt: number
+      readonly updatedAt: number
+      readonly assetId: string
+      readonly transport: string
+      readonly port: number
+      readonly instance: string
+      readonly name?: string | undefined
+      readonly product?: string | undefined
+      readonly version?: string | undefined
+      readonly banner?: string | undefined
+      readonly state: "observed" | "confirmed" | "stale" | "retired" | "conflicted"
+    }>
+    readonly surfaces: ReadonlyArray<{
+      readonly id: string
+      readonly evidence: ReadonlyArray<string>
+      readonly createdAt: number
+      readonly updatedAt: number
+      readonly assetId: string
+      readonly serviceId?: string | undefined
+      readonly kind: string
+      readonly value: string
+      readonly method?: string | undefined
+      readonly state: "observed" | "confirmed" | "stale" | "retired" | "conflicted"
+    }>
+    readonly credentials: ReadonlyArray<{
+      readonly id: string
+      readonly evidence: ReadonlyArray<string>
+      readonly createdAt: number
+      readonly updatedAt: number
+      readonly kind: "password" | "hash" | "token" | "key" | "cookie" | "ticket" | "other"
+      readonly principal: string
+      readonly realm: string
+      readonly secret?: string | undefined
+      readonly secretRef?: string | undefined
+      readonly fingerprint: string
+      readonly source: string
+      readonly validFor: ReadonlyArray<string>
+      readonly state: "unverified" | "valid" | "invalid" | "revoked" | "stale"
+    }>
+    readonly access: ReadonlyArray<{
+      readonly id: string
+      readonly evidence: ReadonlyArray<string>
+      readonly createdAt: number
+      readonly updatedAt: number
+      readonly assetId: string
+      readonly identity: string
+      readonly credentialId?: string | undefined
+      readonly sessionRef?: string | undefined
+      readonly kind: string
+      readonly privilege: string
+      readonly state: "active" | "stale" | "dead"
+    }>
+    readonly findings: ReadonlyArray<{
+      readonly id: string
+      readonly evidence: ReadonlyArray<string>
+      readonly createdAt: number
+      readonly updatedAt: number
+      readonly assetId?: string | undefined
+      readonly surfaceId?: string | undefined
+      readonly title: string
+      readonly vulnerabilityClass: string
+      readonly parameter?: string | undefined
+      readonly severity: "critical" | "high" | "medium" | "low" | "info"
+      readonly confidence: number
+      readonly state: "candidate" | "validated" | "rejected" | "mitigated" | "stale"
+      readonly impact: string
+      readonly reproduction: ReadonlyArray<string>
+    }>
+    readonly hypotheses: ReadonlyArray<{
+      readonly id: string
+      readonly evidence: ReadonlyArray<string>
+      readonly createdAt: number
+      readonly updatedAt: number
+      readonly title: string
+      readonly sourceId?: string | undefined
+      readonly targetId?: string | undefined
+      readonly technique: string
+      readonly rationale: string
+      readonly outcome: "queued" | "running" | "succeeded" | "failed" | "disproved" | "blocked" | "interrupted"
+      readonly summary: string
+      readonly attemptIds: ReadonlyArray<string>
+    }>
+    readonly attempts: ReadonlyArray<{
+      readonly id: string
+      readonly jobId?: string | undefined
+      readonly hypothesisId?: string | undefined
+      readonly toolName: string
+      readonly targetId?: string | undefined
+      readonly summary: string
+      readonly status: "queued" | "running" | "succeeded" | "failed" | "disproved" | "blocked" | "interrupted"
+      readonly error?: string | undefined
+      readonly startedAt: number
+      readonly completedAt?: number | undefined
+      readonly evidence: ReadonlyArray<string>
+    }>
+    readonly evidence: ReadonlyArray<{
+      readonly id: string
+      readonly sourceType: "tool" | "message" | "artifact" | "manual"
+      readonly sourceId: string
+      readonly summary: string
+      readonly observedAt: number
+    }>
+    readonly changes: ReadonlyArray<{
+      readonly id: string
+      readonly revision: number
+      readonly entityType: string
+      readonly entityId: string
+      readonly disposition: "created" | "updated" | "noop" | "rejected"
+      readonly summary: string
+      readonly at: number
+    }>
+    readonly relations: ReadonlyArray<{
+      readonly id: string
+      readonly evidence: ReadonlyArray<string>
+      readonly createdAt: number
+      readonly updatedAt: number
+      readonly from: string
+      readonly to: string
+      readonly kind: "contains" | "connects_to" | "pivots_to" | "authenticates_to" | "leads_to" | "depends_on"
+      readonly state: "observed" | "confirmed" | "disproved" | "stale"
+      readonly rationale: string
+    }>
+  }
+  readonly boards: ReadonlyArray<{ readonly id: string; readonly title: string }>
+  readonly nodes: ReadonlyArray<{
+    readonly id: string
+    readonly board: string
+    readonly title: string
+    readonly kind: string
+    readonly detail: string
+    readonly highlight: boolean
+    readonly entityType?:
+      | "asset"
+      | "service"
+      | "surface"
+      | "credential"
+      | "access"
+      | "finding"
+      | "hypothesis"
+      | undefined
+    readonly entityId?: string | undefined
+    readonly x?: number | undefined
+    readonly y?: number | undefined
+  }>
+  readonly edges: ReadonlyArray<{
+    readonly id: string
+    readonly board: string
+    readonly from: string
+    readonly to: string
+    readonly label: string
+    readonly relation?: string | undefined
+    readonly proven: boolean
+    readonly line: "solid" | "dashed"
+    readonly path: "elbow" | "straight" | "curve"
+  }>
+  readonly cards: ReadonlyArray<{
+    readonly id: string
+    readonly board: string
+    readonly title: string
+    readonly body: string
+    readonly tone: string
+  }>
+  readonly tables: ReadonlyArray<{
+    readonly id: string
+    readonly board: string
+    readonly title: string
+    readonly columns: ReadonlyArray<string>
+    readonly rows: ReadonlyArray<{ readonly id: string; readonly cells: ReadonlyArray<string> }>
+  }>
+}
+export type OperationGetOperation<E = never> = (input: OperationGetInput) => Effect.Effect<OperationGetOutput, E>
+
+export type OperationRevealInput = { readonly sessionID: Session.ID; readonly credentialID: string }
+export type OperationRevealOutput = { readonly secret?: string | undefined }
+export type OperationRevealOperation<E = never> = (
+  input: OperationRevealInput,
+) => Effect.Effect<OperationRevealOutput, E>
+
+export type OperationAuditInput = { readonly sessionID: Session.ID; readonly before?: SessionMessage.ID | undefined }
+export type OperationAuditOutput = {
+  readonly records: ReadonlyArray<{
+    readonly id: string
+    readonly messageID: SessionMessage.ID
+    readonly toolName: string
+    readonly state: "streaming" | "running" | "completed" | "error"
+    readonly startedAt: number
+    readonly completedAt?: number | undefined
+    readonly error?: string | undefined
+    readonly stepCount: number
+    readonly steps: ReadonlyArray<{ readonly toolName: string; readonly state: "running" | "completed" | "error" }>
+  }>
+  readonly next?: SessionMessage.ID | undefined
+}
+export type OperationAuditOperation<E = never> = (input: OperationAuditInput) => Effect.Effect<OperationAuditOutput, E>
+
+export interface OperationApi<E = never> {
+  readonly get: OperationGetOperation<E>
+  readonly reveal: OperationRevealOperation<E>
+  readonly audit: OperationAuditOperation<E>
 }
 
 export type ProjectListInput = { readonly archived?: boolean | undefined }
@@ -2274,8 +2641,10 @@ export interface AppApi<E = never> {
   readonly generate: GenerateApi<E>
   readonly provider: ProviderApi<E>
   readonly integration: IntegrationApi<E>
+  readonly beaconpass: BeaconpassApi<E>
   readonly mcp: McpApi<E>
   readonly credential: CredentialApi<E>
+  readonly operation: OperationApi<E>
   readonly project: ProjectApi<E>
   readonly form: FormApi<E>
   readonly permission: PermissionApi<E>

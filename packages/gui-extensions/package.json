@@ -11,7 +11,9 @@
     "./sdk": "./src/sdk/index.ts",
     "./sdk/main": "./src/sdk/main.ts",
     "./sdk/bridge": "./src/sdk/bridge.ts",
-    "./updater": "./src/updater/contract.ts"
+    "./updater": "./src/updater/contract.ts",
+    "./cobaltelectron": "./src/cobaltelectron/contract.ts",
+    "./details": "./src/details/contract.ts"
   },
   "scripts": {
     "typecheck": "tsgo -b",
@@ -47,7 +49,8 @@
     "remeda": "catalog:",
     "solid-js": "catalog:",
     "solid-presence": "0.2.0",
-    "uqr": "0.1.3"
+    "uqr": "0.1.3",
+    "ws": "8.21.0"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "20.0.11",
@@ -55,6 +58,7 @@
     "@tsconfig/node22": "catalog:",
     "@types/bun": "catalog:",
     "@types/node": "catalog:",
+    "@types/ws": "8.18.1",
     "@typescript/native-preview": "catalog:",
     "devtools-protocol": "0.0.1687809",
     "electron": "44.4.5",

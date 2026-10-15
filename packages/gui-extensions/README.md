@@ -612,6 +612,9 @@ export default setup
  */
 export const builtins = Extension.compose(
   context,
+  operation,
+  beaconpass,
+  { ...cobaltelectron, main: () => import("./cobaltelectron/main") },
   btw,
   debug,
   terminal,
@@ -638,6 +641,9 @@ The window list adds each window entry, loaded with the app:
  */
 export const builtins = Extension.compose(
   { ...context, renderer: eager(contextRenderer) },
+  { ...operation, renderer: eager(operationRenderer) },
+  { ...beaconpass, renderer: eager(beaconpassRenderer) },
+  { ...cobaltelectron, renderer: eager(cobaltelectronRenderer) },
   { ...btw, renderer: eager(btwRenderer) },
   { ...debug, renderer: eager(debugRenderer) },
   { ...terminal, renderer: eager(terminalRenderer) },

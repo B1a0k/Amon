@@ -16,6 +16,10 @@ process.env.AMON_CLI_TARGET = target.target
 for (const key of ["CSC_LINK", "CSC_KEY_PASSWORD", "APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_TEAM_ID"])
   if (process.env[key] === "") delete process.env[key]
 
+await $`bun run build`.cwd(path.join(root, "packages/amon-native")).env({
+  ...process.env,
+  AMON_NATIVE_TARGET: target.target,
+})
 await $`bun run script/build.ts ${`--target=${target.package.replace("@opencode/cli", "opencode")}`} --skip-install`.cwd(
   path.join(root, "packages/cli"),
 )

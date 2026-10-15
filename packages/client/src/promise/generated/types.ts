@@ -208,6 +208,27 @@ export type IntegrationCommandAttemptStatus =
       time: { created: number | "Infinity" | "-Infinity" | "NaN"; expires: number | "Infinity" | "-Infinity" | "NaN" }
     }
 
+export type BeaconPassEngine = {
+  available: boolean
+  name: string
+  version: string
+  target: string
+  error?: string
+  capabilities: Array<"inspect_pe" | "convert_pe">
+}
+
+export type BeaconPassJobID = string
+
+export type BeaconPassArtifactID = string
+
+export type BeaconPassSection = {
+  name: string
+  virtualAddress: number
+  virtualSize: number
+  rawOffset: number
+  rawSize: number
+}
+
 export type McpStatusConnected = { status: "connected" }
 
 export type McpStatusPending = { status: "pending" }
@@ -226,6 +247,196 @@ export type McpResourceTemplate = {
   uriTemplate: string
   description?: string
   mimeType?: string
+}
+
+export type OperationAsset = {
+  id: string
+  evidence: Array<string>
+  createdAt: number
+  updatedAt: number
+  kind: "host" | "device" | "domain" | "application" | "network" | "unknown"
+  displayName: string
+  identifiers: Array<{ kind: string; value: string }>
+  scopeId?: string
+  zone?: string
+  parentAssetId?: string
+  membershipState?: "observed" | "confirmed" | "disproved" | "stale"
+  membershipRationale?: string
+  role?: string
+  os?: string
+  state: "observed" | "confirmed" | "stale" | "retired" | "conflicted"
+}
+
+export type OperationService = {
+  id: string
+  evidence: Array<string>
+  createdAt: number
+  updatedAt: number
+  assetId: string
+  transport: string
+  port: number
+  instance: string
+  name?: string
+  product?: string
+  version?: string
+  banner?: string
+  state: "observed" | "confirmed" | "stale" | "retired" | "conflicted"
+}
+
+export type OperationSurface = {
+  id: string
+  evidence: Array<string>
+  createdAt: number
+  updatedAt: number
+  assetId: string
+  serviceId?: string
+  kind: string
+  value: string
+  method?: string
+  state: "observed" | "confirmed" | "stale" | "retired" | "conflicted"
+}
+
+export type OperationCredential = {
+  id: string
+  evidence: Array<string>
+  createdAt: number
+  updatedAt: number
+  kind: "password" | "hash" | "token" | "key" | "cookie" | "ticket" | "other"
+  principal: string
+  realm: string
+  secret?: string
+  secretRef?: string
+  fingerprint: string
+  source: string
+  validFor: Array<string>
+  state: "unverified" | "valid" | "invalid" | "revoked" | "stale"
+}
+
+export type OperationAccess = {
+  id: string
+  evidence: Array<string>
+  createdAt: number
+  updatedAt: number
+  assetId: string
+  identity: string
+  credentialId?: string
+  sessionRef?: string
+  kind: string
+  privilege: string
+  state: "active" | "stale" | "dead"
+}
+
+export type OperationFinding = {
+  id: string
+  evidence: Array<string>
+  createdAt: number
+  updatedAt: number
+  assetId?: string
+  surfaceId?: string
+  title: string
+  vulnerabilityClass: string
+  parameter?: string
+  severity: "critical" | "high" | "medium" | "low" | "info"
+  confidence: number
+  state: "candidate" | "validated" | "rejected" | "mitigated" | "stale"
+  impact: string
+  reproduction: Array<string>
+}
+
+export type OperationHypothesis = {
+  id: string
+  evidence: Array<string>
+  createdAt: number
+  updatedAt: number
+  title: string
+  sourceId?: string
+  targetId?: string
+  technique: string
+  rationale: string
+  outcome: "queued" | "running" | "succeeded" | "failed" | "disproved" | "blocked" | "interrupted"
+  summary: string
+  attemptIds: Array<string>
+}
+
+export type OperationAttempt = {
+  id: string
+  jobId?: string
+  hypothesisId?: string
+  toolName: string
+  targetId?: string
+  summary: string
+  status: "queued" | "running" | "succeeded" | "failed" | "disproved" | "blocked" | "interrupted"
+  error?: string
+  startedAt: number
+  completedAt?: number
+  evidence: Array<string>
+}
+
+export type OperationEvidence = {
+  id: string
+  sourceType: "tool" | "message" | "artifact" | "manual"
+  sourceId: string
+  summary: string
+  observedAt: number
+}
+
+export type OperationChange = {
+  id: string
+  revision: number
+  entityType: string
+  entityId: string
+  disposition: "created" | "updated" | "noop" | "rejected"
+  summary: string
+  at: number
+}
+
+export type OperationRelation = {
+  id: string
+  evidence: Array<string>
+  createdAt: number
+  updatedAt: number
+  from: string
+  to: string
+  kind: "contains" | "connects_to" | "pivots_to" | "authenticates_to" | "leads_to" | "depends_on"
+  state: "observed" | "confirmed" | "disproved" | "stale"
+  rationale: string
+}
+
+export type OperationBoard = { id: string; title: string }
+
+export type OperationNode = {
+  id: string
+  board: string
+  title: string
+  kind: string
+  detail: string
+  highlight: boolean
+  entityType?: "asset" | "service" | "surface" | "credential" | "access" | "finding" | "hypothesis"
+  entityId?: string
+  x?: number
+  y?: number
+}
+
+export type OperationEdge = {
+  id: string
+  board: string
+  from: string
+  to: string
+  label: string
+  relation?: string
+  proven: boolean
+  line: "solid" | "dashed"
+  path: "elbow" | "straight" | "curve"
+}
+
+export type OperationCard = { id: string; board: string; title: string; body: string; tone: string }
+
+export type OperationTable = {
+  id: string
+  board: string
+  title: string
+  columns: Array<string>
+  rows: Array<{ id: string; cells: Array<string> }>
 }
 
 export type ProjectVcs = string
@@ -388,6 +599,22 @@ export type SessionMessageCompactionRunning = {
   reason: "auto" | "manual"
   summary: string
   recent: string
+}
+
+export type BeaconPassSource =
+  | { type: "manual" }
+  | { type: "agent"; sessionID: SessionID; messageID: SessionMessageID; toolCallID: string }
+
+export type OperationAuditEntry = {
+  id: string
+  messageID: SessionMessageID
+  toolName: string
+  state: "streaming" | "running" | "completed" | "error"
+  startedAt: number
+  completedAt?: number
+  error?: string
+  stepCount: number
+  steps: Array<{ toolName: string; state: "running" | "completed" | "error" }>
 }
 
 export type FileSystemEntry = { path: RelativePath; type: "file" | "directory" }
@@ -679,6 +906,34 @@ export type IntegrationAttempt = {
 
 export type IntegrationCommandAttempt = { attemptID: IntegrationAttemptID; time: { created: number; expires: number } }
 
+export type BeaconPassArtifact = {
+  id: BeaconPassArtifactID
+  jobID: BeaconPassJobID
+  kind: "shellcode" | "report"
+  name: string
+  path: string
+  mediaType: string
+  size: number
+  sha256: string
+  createdAt: number
+}
+
+export type BeaconPassPe = {
+  path: string
+  architecture: "x86" | "x64"
+  entrypoint: number
+  imageBase: string
+  sectionAlignment: number
+  fileAlignment: number
+  imageSize: number
+  headerSize: number
+  hasRelocations: boolean
+  hasTls: boolean
+  isDotNet: boolean
+  overlaySize: number
+  sections: Array<BeaconPassSection>
+}
+
 export type McpServer = {
   name: string
   status: McpStatusConnected | McpStatusPending | McpStatusDisabled | McpStatusFailed | McpStatusNeedsAuth
@@ -686,6 +941,23 @@ export type McpServer = {
 }
 
 export type McpResourceCatalog = { resources: Array<McpResource>; templates: Array<McpResourceTemplate> }
+
+export type OperationFacts = {
+  schemaVersion: 2
+  engagementId: string
+  revision: number
+  assets: Array<OperationAsset>
+  services: Array<OperationService>
+  surfaces: Array<OperationSurface>
+  credentials: Array<OperationCredential>
+  access: Array<OperationAccess>
+  findings: Array<OperationFinding>
+  hypotheses: Array<OperationHypothesis>
+  attempts: Array<OperationAttempt>
+  evidence: Array<OperationEvidence>
+  changes: Array<OperationChange>
+  relations: Array<OperationRelation>
+}
 
 export type Project = {
   id: ProjectID
@@ -900,6 +1172,25 @@ export type ProviderInfo = {
 }
 
 export type PermissionRuleset = Array<PermissionRule>
+
+export type BeaconPassJob = {
+  id: BeaconPassJobID
+  operation: "inspect_pe" | "convert_pe"
+  status: "running" | "succeeded" | "failed"
+  source: BeaconPassSource
+  inputPath: string
+  outputPath?: string
+  stubPath?: string
+  scheme?: "1" | "2"
+  format?: "binary" | "hex" | "c"
+  architecture?: "x86" | "x64"
+  artifactID?: BeaconPassArtifactID
+  error?: string
+  createdAt: number
+  completedAt?: number
+}
+
+export type OperationAuditPage = { records: Array<OperationAuditEntry>; next?: SessionMessageID }
 
 export type SessionMessageUser = {
   id: SessionMessageID
@@ -1526,6 +1817,24 @@ export type SessionCompactionDelta = {
   data: { sessionID: SessionID; text: string }
 }
 
+export type BeaconpassUpdated = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "beaconpass.updated"
+  location?: LocationRef
+  data: { jobID: BeaconPassJobID; status: "running" | "succeeded" | "failed" }
+}
+
+export type OperationUpdated = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "operation.updated"
+  location?: LocationRef
+  data: { sessionID: SessionID; revision: number }
+}
+
 export type FilesystemChanged = {
   id: EventID
   created: number
@@ -1914,6 +2223,16 @@ export type CredentialKey = {
 
 export type ConnectionInfo = ConnectionCredentialInfo | ConnectionEnvInfo
 
+export type OperationDocument = {
+  schemaVersion: 1
+  operation: OperationFacts
+  boards: Array<OperationBoard>
+  nodes: Array<OperationNode>
+  edges: Array<OperationEdge>
+  cards: Array<OperationCard>
+  tables: Array<OperationTable>
+}
+
 export type PtyCreated = {
   id: EventID
   created: number
@@ -2293,6 +2612,14 @@ export type ConfigEntry =
     }
   | { type: "directory"; path: AbsolutePath }
 
+export type BeaconPassSnapshot = {
+  engine: BeaconPassEngine
+  jobs: Array<BeaconPassJob>
+  artifacts: Array<BeaconPassArtifact>
+}
+
+export type BeaconPassConvertResult = { job: BeaconPassJob; artifact: BeaconPassArtifact }
+
 export type SessionInboxUser = {
   id: SessionMessageID
   sessionID: SessionID
@@ -2575,6 +2902,8 @@ export type V2Event =
   | SessionRevertStaged
   | SessionRevertCleared
   | SessionRevertCommitted
+  | BeaconpassUpdated
+  | OperationUpdated
   | FilesystemChanged
   | ReferenceUpdated
   | PermissionAsked
@@ -5893,6 +6222,60 @@ export type IntegrationCommandCancelInput = {
 
 export type IntegrationCommandCancelOutput = void
 
+export type BeaconpassGetInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type BeaconpassGetOutput = { location: LocationPublicRef; data: BeaconPassSnapshot }
+
+export type BeaconpassInspectInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly path: { readonly path: string }["path"]
+}
+
+export type BeaconpassInspectOutput = { location: LocationPublicRef; data: BeaconPassPe }
+
+export type BeaconpassConvertInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly path: {
+    readonly path: string
+    readonly stubPath?: string
+    readonly scheme?: "1" | "2"
+    readonly format?: "binary" | "hex" | "c"
+    readonly outputPath?: string
+  }["path"]
+  readonly stubPath?: {
+    readonly path: string
+    readonly stubPath?: string
+    readonly scheme?: "1" | "2"
+    readonly format?: "binary" | "hex" | "c"
+    readonly outputPath?: string
+  }["stubPath"]
+  readonly scheme?: {
+    readonly path: string
+    readonly stubPath?: string
+    readonly scheme?: "1" | "2"
+    readonly format?: "binary" | "hex" | "c"
+    readonly outputPath?: string
+  }["scheme"]
+  readonly format?: {
+    readonly path: string
+    readonly stubPath?: string
+    readonly scheme?: "1" | "2"
+    readonly format?: "binary" | "hex" | "c"
+    readonly outputPath?: string
+  }["format"]
+  readonly outputPath?: {
+    readonly path: string
+    readonly stubPath?: string
+    readonly scheme?: "1" | "2"
+    readonly format?: "binary" | "hex" | "c"
+    readonly outputPath?: string
+  }["outputPath"]
+}
+
+export type BeaconpassConvertOutput = { location: LocationPublicRef; data: BeaconPassConvertResult }
+
 export type McpListInput = {
   readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
 }
@@ -6126,6 +6509,24 @@ export type CredentialActivateOutput = void
 export type CredentialRemoveInput = { readonly credentialID: { readonly credentialID: string }["credentialID"] }
 
 export type CredentialRemoveOutput = void
+
+export type OperationGetInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type OperationGetOutput = { data: OperationDocument }["data"]
+
+export type OperationRevealInput = {
+  readonly sessionID: { readonly sessionID: string; readonly credentialID: string }["sessionID"]
+  readonly credentialID: { readonly sessionID: string; readonly credentialID: string }["credentialID"]
+}
+
+export type OperationRevealOutput = { data: { secret?: string } }["data"]
+
+export type OperationAuditInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly before?: { readonly before?: string | undefined }["before"]
+}
+
+export type OperationAuditOutput = { data: OperationAuditPage }["data"]
 
 export type ProjectListInput = { readonly archived?: { readonly archived?: boolean | undefined }["archived"] }
 

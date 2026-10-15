@@ -14,10 +14,13 @@ async function main() {
   const release = await acquireDevInstance(join(import.meta.dirname, ".."), () => {
     void focusDesktop().catch(console.error)
   })
+
   if (!release) {
     console.log("Amon Dev is already running; focusing the existing window.")
+
     return
   }
+
   try {
     process.env.AMON_CHANNEL = "local"
     process.env.AMON_VERSION = `2.0.0-local-${Date.now()}`
@@ -46,9 +49,13 @@ async function focusDesktop() {
     (response) => response.ok,
     () => false,
   )
+
   if (!ready) return
+
   if (!(await Bun.file(join(import.meta.dirname, "../out/main/index.js")).exists())) return
+
   const { default: electron } = await import("electron")
+
   await Bun.spawn([process.env.ELECTRON_EXEC_PATH ?? electron, join(import.meta.dirname, "../out/main/index.js")], {
     env: process.env,
     stdio: ["ignore", "ignore", "ignore"],
@@ -81,6 +88,7 @@ function selectOptions(): DevOptions {
 
 async function prepareServer(source: ServerSource) {
   if (source.type === "download") return downloadCliToResources(source.version, windowsify("resources/amon-engine-dev"))
+  await $`bun run build`.cwd(join(import.meta.dirname, "../../amon-native"))
   buildWebUi()
   process.env.AMON_DESKTOP_CLI_DEV = join(import.meta.dirname, "../../cli")
 

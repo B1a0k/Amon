@@ -124,6 +124,25 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
       }))
     },
   }
+  const amonNative = path.resolve(
+    dir,
+    "../amon-native/prebuilds",
+    `amon-native.${item.os}-${item.arch}${item.os === "linux" ? "-gnu" : item.os === "win32" ? "-msvc" : ""}.node`,
+  )
+  const amonNativePlugin: BunPlugin = {
+    name: "amon-native-addon",
+    setup(build) {
+      build.onLoad({ filter: /amon-native[/\\]src[/\\]index\.ts$/ }, () => ({
+        loader: "js",
+        contents: `import addon from ${JSON.stringify(amonNative.replaceAll("\\", "/"))} with { type: "file" }
+let loaded
+export function native() {
+  loaded ??= require(addon)
+  return loaded
+}`,
+      }))
+    },
+  }
   const simulationInputs = new Set<string>()
   const simulationGraphPlugin: BunPlugin = {
     name: "opencode-simulation-graph",
@@ -153,6 +172,7 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
     tsconfig: "./tsconfig.json",
     plugins: [
       appAssetsPlugin,
+      amonNativePlugin,
       parcelWatcherPlugin,
       opencodePtyPlugin,
       pluginRuntimePlugin,

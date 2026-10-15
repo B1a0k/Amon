@@ -1,6 +1,12 @@
 import { Extension, type Definition } from "./sdk"
 import context from "./context"
 import contextRenderer from "./context/renderer"
+import operation from "./operation"
+import operationRenderer from "./operation/renderer"
+import beaconpass from "./beaconpass"
+import beaconpassRenderer from "./beaconpass/renderer"
+import cobaltelectron from "./cobaltelectron"
+import cobaltelectronRenderer from "./cobaltelectron/renderer"
 import btw from "./btw"
 import btwRenderer from "./btw/renderer"
 import debug from "./debug"
@@ -37,6 +43,9 @@ const eager = (setup: Awaited<ReturnType<NonNullable<Definition["renderer"]>>>["
  */
 export const builtins = Extension.compose(
   { ...context, renderer: eager(contextRenderer) },
+  { ...operation, renderer: eager(operationRenderer) },
+  { ...beaconpass, renderer: eager(beaconpassRenderer) },
+  { ...cobaltelectron, renderer: eager(cobaltelectronRenderer) },
   { ...btw, renderer: eager(btwRenderer) },
   { ...debug, renderer: eager(debugRenderer) },
   { ...terminal, renderer: eager(terminalRenderer) },

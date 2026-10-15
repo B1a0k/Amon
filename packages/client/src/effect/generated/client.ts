@@ -143,6 +143,12 @@ import type {
   IntegrationCommandStatusOutput,
   IntegrationCommandCancelInput,
   IntegrationCommandCancelOutput,
+  BeaconpassGetInput,
+  BeaconpassGetOutput,
+  BeaconpassInspectInput,
+  BeaconpassInspectOutput,
+  BeaconpassConvertInput,
+  BeaconpassConvertOutput,
   McpListInput,
   McpListOutput,
   McpAddInput,
@@ -164,6 +170,12 @@ import type {
   CredentialActivateOutput,
   CredentialRemoveInput,
   CredentialRemoveOutput,
+  OperationGetInput,
+  OperationGetOutput,
+  OperationRevealInput,
+  OperationRevealOutput,
+  OperationAuditInput,
+  OperationAuditOutput,
   ProjectListInput,
   ProjectListOutput,
   ProjectUpdateInput,
@@ -1002,6 +1014,38 @@ const adaptGroupIntegration = (raw: RawClient["server.integration"]) => ({
   },
 })
 
+const EndpointBeaconpassGet = (raw: RawClient["server.beaconpass"]) => (input?: BeaconpassGetInput) =>
+  preserveEffect<BeaconpassGetOutput>()(
+    raw["beaconpass.get"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointBeaconpassInspect = (raw: RawClient["server.beaconpass"]) => (input: BeaconpassInspectInput) =>
+  preserveEffect<BeaconpassInspectOutput>()(
+    raw["beaconpass.inspect"]({ query: { location: input["location"] }, payload: { path: input["path"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointBeaconpassConvert = (raw: RawClient["server.beaconpass"]) => (input: BeaconpassConvertInput) =>
+  preserveEffect<BeaconpassConvertOutput>()(
+    raw["beaconpass.convert"]({
+      query: { location: input["location"] },
+      payload: {
+        path: input["path"],
+        stubPath: input["stubPath"],
+        scheme: input["scheme"],
+        format: input["format"],
+        outputPath: input["outputPath"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const adaptGroupBeaconpass = (raw: RawClient["server.beaconpass"]) => ({
+  get: EndpointBeaconpassGet(raw),
+  inspect: EndpointBeaconpassInspect(raw),
+  convert: EndpointBeaconpassConvert(raw),
+})
+
 const EndpointMcpList = (raw: RawClient["server.mcp"]) => (input?: McpListInput) =>
   preserveEffect<McpListOutput>()(
     raw["mcp.list"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
@@ -1101,6 +1145,36 @@ const adaptGroupCredential = (raw: RawClient["server.credential"]) => ({
   update: EndpointCredentialUpdate(raw),
   activate: EndpointCredentialActivate(raw),
   remove: EndpointCredentialRemove(raw),
+})
+
+const EndpointOperationGet = (raw: RawClient["server.operation"]) => (input: OperationGetInput) =>
+  preserveEffect<OperationGetOutput>()(
+    raw["operation.get"]({ params: { sessionID: input["sessionID"] } }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointOperationReveal = (raw: RawClient["server.operation"]) => (input: OperationRevealInput) =>
+  preserveEffect<OperationRevealOutput>()(
+    raw["operation.reveal"]({ params: { sessionID: input["sessionID"], credentialID: input["credentialID"] } }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointOperationAudit = (raw: RawClient["server.operation"]) => (input: OperationAuditInput) =>
+  preserveEffect<OperationAuditOutput>()(
+    raw["operation.audit"]({ params: { sessionID: input["sessionID"] }, query: { before: input["before"] } }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const adaptGroupOperation = (raw: RawClient["server.operation"]) => ({
+  get: EndpointOperationGet(raw),
+  reveal: EndpointOperationReveal(raw),
+  audit: EndpointOperationAudit(raw),
 })
 
 const EndpointProjectList = (raw: RawClient["server.project"]) => (input?: ProjectListInput) =>
@@ -1618,8 +1692,10 @@ const adaptClient = (raw: RawClient) => ({
   generate: adaptGroupGenerate(raw["server.generate"]),
   provider: adaptGroupProvider(raw["server.provider"]),
   integration: adaptGroupIntegration(raw["server.integration"]),
+  beaconpass: adaptGroupBeaconpass(raw["server.beaconpass"]),
   mcp: adaptGroupMcp(raw["server.mcp"]),
   credential: adaptGroupCredential(raw["server.credential"]),
+  operation: adaptGroupOperation(raw["server.operation"]),
   project: adaptGroupProject(raw["server.project"]),
   form: adaptGroupForm(raw["server.form"]),
   permission: adaptGroupPermission(raw["server.permission"]),

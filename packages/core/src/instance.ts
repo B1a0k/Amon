@@ -1,5 +1,6 @@
 import { Context, Effect, Layer } from "effect"
 import { Agent } from "./agent.js"
+import { BeaconPass } from "./beaconpass.js"
 import { AISDK } from "./aisdk.js"
 import { Model } from "./model.js"
 import { Provider } from "./provider.js"
@@ -59,6 +60,7 @@ export { Service, node, type Interface } from "./instance/service.js"
 const nodes = [
   Location.node,
   LocationLifecycle.node,
+  BeaconPass.node,
   Environment.node,
   Config.node,
   Agent.node,

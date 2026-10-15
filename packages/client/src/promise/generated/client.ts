@@ -137,6 +137,12 @@ import type {
   IntegrationCommandStatusOutput,
   IntegrationCommandCancelInput,
   IntegrationCommandCancelOutput,
+  BeaconpassGetInput,
+  BeaconpassGetOutput,
+  BeaconpassInspectInput,
+  BeaconpassInspectOutput,
+  BeaconpassConvertInput,
+  BeaconpassConvertOutput,
   McpListInput,
   McpListOutput,
   McpAddInput,
@@ -158,6 +164,12 @@ import type {
   CredentialActivateOutput,
   CredentialRemoveInput,
   CredentialRemoveOutput,
+  OperationGetInput,
+  OperationGetOutput,
+  OperationRevealInput,
+  OperationRevealOutput,
+  OperationAuditInput,
+  OperationAuditOutput,
   ProjectListInput,
   ProjectListOutput,
   ProjectUpdateInput,
@@ -1337,6 +1349,52 @@ export function make(options: ClientOptions) {
           ),
       },
     },
+    beaconpass: {
+      get: (input?: BeaconpassGetInput, requestOptions?: RequestOptions) =>
+        request<BeaconpassGetOutput>(
+          {
+            method: "GET",
+            path: `/api/beaconpass`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      inspect: (input: BeaconpassInspectInput, requestOptions?: RequestOptions) =>
+        request<BeaconpassInspectOutput>(
+          {
+            method: "POST",
+            path: `/api/beaconpass/inspect`,
+            query: { location: input["location"] },
+            body: { path: input["path"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      convert: (input: BeaconpassConvertInput, requestOptions?: RequestOptions) =>
+        request<BeaconpassConvertOutput>(
+          {
+            method: "POST",
+            path: `/api/beaconpass/convert`,
+            query: { location: input["location"] },
+            body: {
+              path: input["path"],
+              stubPath: input["stubPath"],
+              scheme: input["scheme"],
+              format: input["format"],
+              outputPath: input["outputPath"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
     mcp: {
       list: (input?: McpListInput, requestOptions?: RequestOptions) =>
         request<McpListOutput>(
@@ -1472,6 +1530,42 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+    },
+    operation: {
+      get: (input: OperationGetInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: OperationGetOutput }>(
+          {
+            method: "GET",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/operation`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
+      reveal: (input: OperationRevealInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: OperationRevealOutput }>(
+          {
+            method: "GET",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/operation/credential/${encodeURIComponent(input.credentialID)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
+      audit: (input: OperationAuditInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: OperationAuditOutput }>(
+          {
+            method: "GET",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/operation/audit`,
+            query: { before: input["before"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
     },
     project: {
       list: (input?: ProjectListInput, requestOptions?: RequestOptions) =>

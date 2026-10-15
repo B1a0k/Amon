@@ -74,6 +74,10 @@ import { GlobTool } from "../tool/plugin/glob.js"
 import { GrepTool } from "../tool/plugin/grep.js"
 import { McpResourceTools } from "../tool/plugin/mcp-resource.js"
 import { OpenCodeTools } from "../tool/plugin/opencode.js"
+import { OperationTools } from "../tool/plugin/operation.js"
+import { Operation } from "../operation.js"
+import { BeaconPassTools } from "../tool/plugin/beaconpass.js"
+import { BeaconPass } from "../beaconpass.js"
 import { QuestionTool } from "../tool/plugin/question.js"
 import { ReadToolFileSystem } from "../tool/read-filesystem.js"
 import { ReadTool } from "../tool/plugin/read.js"
@@ -128,6 +132,8 @@ const services = [
   Integration.Service,
   Job.Service,
   KV.Service,
+  BeaconPass.Service,
+  Operation.Service,
   LLMClient.Service,
   Location.Service,
   ManagedPolicy.Service,
@@ -182,6 +188,8 @@ export const requirements = LayerNode.group([
   Integration.node,
   Job.node,
   KV.node,
+  BeaconPass.node,
+  Operation.node,
   llmClient,
   Location.node,
   ManagedPolicy.node,
@@ -237,6 +245,8 @@ const pre = [
   GlobTool.Plugin,
   GrepTool.Plugin,
   OpenCodeTools.Plugin,
+  BeaconPassTools.Plugin,
+  OperationTools.Plugin,
   McpResourceTools.Plugin,
   QuestionTool.Plugin,
   ReadTool.Plugin,

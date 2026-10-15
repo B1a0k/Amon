@@ -13,6 +13,8 @@ import { ExtensionStyles } from "./render"
 import { ExtensionServersProvider } from "./servers"
 import { ExtensionServerEndpoints } from "./server-shell"
 import { createContext, useContext } from "solid-js"
+import { useLanguage } from "@/runtime/i18n/language"
+import { showToast } from "@/shell/notifications/toast"
 
 const HostApisContext = createContext<HostApis>()
 
@@ -29,10 +31,19 @@ export function useHostApis() {
 /** Mounts the extension host for the window. Lives above the app interface so extensions can contribute servers. */
 export function ExtensionRoot(props: ParentProps) {
   const platform = usePlatform()
+  const language = useLanguage()
   const apis = createHostApis()
   const bridge = platform.extensions
   const menubar = createMenubarItems(bridge)
-  const ipcs = createIpcClients(bridge)
+
+  const ipcs = createIpcClients(bridge, ({ ipc }) => {
+    showToast({
+      variant: "error",
+      title: language.t("common.requestFailed"),
+      description: language.t("settings.guiExtensions.ipcFailed", { ipc }),
+    })
+  })
+
   onCleanup(ipcs.dispose)
   const installed = createInstalled(bridge)
 

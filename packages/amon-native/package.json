@@ -1,0 +1,14 @@
+{
+  "name": "@amon/native",
+  "version": "2.0.27",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun run script/build.ts",
+    "typecheck": "cargo check",
+    "test": "cargo test"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

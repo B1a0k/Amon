@@ -3,6 +3,8 @@
 import { NodeFileSystem } from "@effect/platform-node"
 import { Service } from "@opencode/client/effect/service"
 import { ServerInfo } from "@opencode/protocol/groups/server"
+import { BeaconPass } from "@opencode/schema/beaconpass"
+import { Location } from "@opencode/schema/location"
 import { Effect, Schema } from "effect"
 import fs from "node:fs/promises"
 import os from "node:os"
@@ -44,6 +46,7 @@ try {
   const token = encodeURIComponent(credential)
   const serverInfo = await waitForReady(info.url, headers)
   if (serverInfo.pid !== info.pid) throw new Error("Server info does not match registration")
+  await verifyBeaconPass(info.url, headers)
   const tokenInfo = await fetch(new URL(`/api/info?auth_token=${token}`, info.url), {
     signal: AbortSignal.timeout(5_000),
   })
@@ -134,6 +137,17 @@ async function verifyWebUi(url: string) {
   const entry = await fetch(new URL(script, url), { signal: AbortSignal.timeout(5_000) })
   if (entry.status !== 200 || (await entry.text()).length === 0)
     throw new Error(`Compiled service did not serve ${script}`)
+}
+
+async function verifyBeaconPass(url: string, headers: HeadersInit) {
+  const endpoint = new URL("/api/beaconpass", url)
+  endpoint.searchParams.set("location[directory]", root)
+  const response = await fetch(endpoint, { headers, signal: AbortSignal.timeout(10_000) })
+  if (!response.ok) throw new Error(`Compiled BeaconPass endpoint returned ${response.status}`)
+  const snapshot = await Schema.decodeUnknownPromise(Location.response(BeaconPass.Snapshot))(await response.json())
+  if (!snapshot.data.engine.available) throw new Error(snapshot.data.engine.error ?? "Native BeaconPass engine is unavailable")
+  if (!snapshot.data.engine.capabilities.includes("convert_pe"))
+    throw new Error("Native BeaconPass engine did not expose PE conversion")
 }
 
 async function waitForReady(url: string, headers: HeadersInit) {

@@ -21,7 +21,7 @@ permissions:
 
 concurrency:
   group: amon-desktop-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   version:
@@ -80,7 +80,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix: ${{ fromJSON(needs.version.outputs.matrix) }}
     env:
       AMON_CHANNEL: prod
@@ -101,6 +101,9 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: "1.4.2"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
         run: |

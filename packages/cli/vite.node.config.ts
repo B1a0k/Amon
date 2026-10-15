@@ -239,6 +239,7 @@ process.env.AMON_TREE_SITTER_BASH_WASM_PATH = __ocPath.join(__ocAssetRoot, ${JSO
 process.env.AMON_TREE_SITTER_POWERSHELL_WASM_PATH = __ocPath.join(__ocAssetRoot, ${JSON.stringify(shellParserWasmAssets.powershell)})
 process.env.FFF_BINARY_PATH = __ocPath.join(__ocAssetRoot, ${JSON.stringify(input.target.fffAsset)})
 process.env.AMON_FFF_FFI_PATH = __ocPath.join(__ocAssetRoot, ${JSON.stringify(input.target.fffFfiAsset)})
+process.env.AMON_NATIVE_PATH = __ocPath.join(__ocAssetRoot, ${JSON.stringify(input.target.amonNativeAsset)})
 if (__ocPersistentPty && !process.env.AMON_PTY_BIN) process.env.AMON_PTY_BIN = __ocPath.join(__ocAssetRoot, __ocPersistentPty)
 try {
   globalThis.__AMON_FFF_FFI = require(process.env.AMON_FFF_FFI_PATH)
@@ -257,13 +258,7 @@ export type NodeBuildInput = {
 export function mainConfig(input: NodeBuildInput): UserConfig {
   return defineConfig({
     root: dir,
-    plugins: [
-      appAssetsPlugin(),
-      rawTextPlugin(),
-      runtimeRequirePlugin(),
-      fffNodePlugin(),
-      simulationGraphPlugin(),
-    ],
+    plugins: [appAssetsPlugin(), rawTextPlugin(), runtimeRequirePlugin(), fffNodePlugin(), simulationGraphPlugin()],
     resolve,
     esbuild: { jsx: "automatic" },
     define: {

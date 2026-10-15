@@ -446,6 +446,7 @@ export const dict = {
   "common.closeTab": "关闭标签页",
   "common.dismiss": "忽略",
   "common.requestFailed": "请求失败",
+  "settings.guiExtensions.ipcFailed": "无法读取桌面扩展 {{ipc}} 的数据，请在设置中检查该扩展。",
   "common.moreOptions": "更多选项",
   "common.learnMore": "了解更多",
   "common.rename": "重命名",

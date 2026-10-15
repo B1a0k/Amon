@@ -1,6 +1,8 @@
 import { DialogProvider } from "@opencode/ui/context/dialog"
 import {
   Panel,
+  MenuItem,
+  type ComposerNote,
   type Appearance,
   type Build,
   type Definition,
@@ -18,6 +20,7 @@ import {
 } from "@opencode/gui-extensions/sdk"
 import {
   createComponent,
+  For,
   createMemo,
   createSignal,
   getOwner,
@@ -25,6 +28,7 @@ import {
   runWithOwner,
   Show,
   type ParentProps,
+  type ComponentProps,
 } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { Schema } from "effect"
@@ -37,9 +41,12 @@ import { createHostApis } from "../src/runtime/extension/host-apis"
 import { createInstalled } from "../src/runtime/extension/installed"
 import { extensionEnabled } from "@opencode/gui-extensions/sdk/bridge"
 import { createRegion, RegionContent } from "../src/runtime/extension/panels"
-import { ExtensionSlot } from "../src/runtime/extension/render"
+import { ExtensionSlot, ExtensionStyles } from "../src/runtime/extension/render"
 import { persistedHandle } from "../src/runtime/extension/stores"
-import { LanguageProvider } from "../src/runtime/i18n/language"
+import { Menu } from "@opencode/ui/menu"
+import { IconButton } from "@opencode/ui/icon-button"
+import { Icon } from "@opencode/ui/icon"
+import { LanguageProvider, useLanguage } from "../src/runtime/i18n/language"
 import { GuiExtensionsSettings } from "../src/runtime/extension/settings-page-dev"
 
 export { bindExtension, useExtension, Contract, createKeyed, Panel, Slot, Store } from "@opencode/gui-extensions/sdk"
@@ -53,6 +60,9 @@ type Interface = Parameters<ReturnType<typeof createHostApis>["attach"]>[0]
 
 /** The host APIs a mounted fixture created, once it rendered. */
 type Captured = { apis?: ReturnType<typeof createHostApis> }
+
+/** The routed fixture's native language control, once its provider mounted. */
+type FixtureLanguage = { set?: (locale: "en" | "zh") => void }
 
 /** A value the fixture's storage holds as JSON. */
 type Json = string | number | boolean | null | readonly Json[] | { readonly [key: string]: Json }
@@ -354,7 +364,14 @@ function standIn(overrides: Partial<Interface>): Interface {
 }
 
 /** The real host over the real HostApis of a web window; `mounted`, when given, attaches as the app interface. */
-function RealHost(props: ParentProps<{ definitions: readonly Definition[]; captured: Captured; mounted?: Interface }>) {
+function RealHost(
+  props: ParentProps<{
+    definitions: readonly Definition[]
+    captured: Captured
+    mounted?: Interface
+    ipc?: ComponentProps<typeof ExtensionHostProvider>["ipc"]
+  }>,
+) {
   const apis = createHostApis()
   props.captured.apis = apis
 
@@ -366,7 +383,9 @@ function RealHost(props: ParentProps<{ definitions: readonly Definition[]; captu
       disabled={() => new Set<string>()}
       apis={apis.apis}
       whenMounted={apis.whenMounted}
+      ipc={props.ipc}
     >
+      <ExtensionStyles />
       {props.children}
     </ExtensionHostProvider>
   )
@@ -379,14 +398,27 @@ function RealHost(props: ParentProps<{ definitions: readonly Definition[]; captu
  * does: a new session object each time, delivered through the same reactive inputs, while the one screen object
  * `ctx.screen` returns follows the route. Its composer records which session each attachment reached.
  */
-export function mountSessionRegion(input: { definitions: readonly Definition[]; active: string }) {
+export function mountSessionRegion(input: {
+  definitions: readonly Definition[]
+  active: string
+  language?: "en" | "zh"
+  interactive?: boolean
+  session?: (id: string) => MountedSession
+  layout?: Interface["layout"]
+  ipc?: ComponentProps<typeof ExtensionHostProvider>["ipc"]
+}) {
   const container = document.createElement("div")
   document.body.appendChild(container)
   const hosts: ExtensionHost[] = []
   const captured: Captured = {}
   const attached: string[] = []
+  const notes: ComposerNote[] = []
+  const language: FixtureLanguage = {}
+  const [active, setActive] = createSignal<string | undefined>(input.active)
+  const [closed, setClosed] = createSignal<ReadonlySet<string>>(new Set())
 
   const object = (id: string) => {
+    if (input.session) return input.session(id)
     const value = { key: `fixture\n${id}`, id, tab: id, pending: false, location: { directory: "/repo" }, visit: {} }
 
     // SAFETY: the region and slot pass the object through; the test's extension reads only `key` and `id`.
@@ -398,7 +430,14 @@ export function mountSessionRegion(input: { definitions: readonly Definition[]; 
   const [routed, setRouted] = createSignal(true)
 
   const route = {
-    composer: { attach: () => void attached.push(view().id), update() {}, detach() {} },
+    composer: {
+      attach: (part: ComposerNote) => {
+        attached.push(view().id)
+        notes.push(part)
+      },
+      update() {},
+      detach() {},
+    },
   }
 
   // SAFETY: the test's extension reads only `composer.attach` of the screen.
@@ -410,8 +449,14 @@ export function mountSessionRegion(input: { definitions: readonly Definition[]; 
   function Region() {
     const host = useExtensionHost()
     hosts.push(host)
+    language.set = useLanguage().setLocale
+
     // Every panel's `main` tab is stored, and `active` selected, as a strip restored after a reload.
-    const all = () => host.items(Panel).map((item) => `${item.extension}:main`)
+    const all = () =>
+      host
+        .items(Panel)
+        .map((item) => `${item.extension}:main`)
+        .filter((key) => !closed().has(key))
 
     const region = createRegion({
       region: "side",
@@ -419,9 +464,9 @@ export function mountSessionRegion(input: { definitions: readonly Definition[]; 
       screen,
       tabs: () => ({
         all,
-        active: () => input.active,
+        active: () => (input.interactive ? active() : input.active),
         setAll() {},
-        setActive() {},
+        setActive,
         close() {},
         remap() {},
       }),
@@ -429,6 +474,42 @@ export function mountSessionRegion(input: { definitions: readonly Definition[]; 
 
     return (
       <Show when={host.ready()}>
+        <Show when={input.session}>
+          <div style={{ display: "flex", gap: "4px", "align-items": "center", "flex-shrink": "0" }}>
+            <ExtensionSlot
+              at="session.header"
+              input={{
+                active: true,
+                get session() {
+                  return view()
+                },
+                screen,
+              }}
+            />
+            <Show when={input.interactive}>
+              <Menu appearance="standard" modal={false} placement="bottom-start">
+                <Menu.Trigger
+                  as={IconButton}
+                  icon={<Icon name="plus" />}
+                  variant="ghost-muted"
+                  aria-label="Add panel"
+                />
+                <Menu.Portal>
+                  <Menu.Content>
+                    <For each={host.list(MenuItem).filter((item) => item.menu === "session.panel")}>
+                      {(item) => (
+                        <Menu.Item onSelect={() => item.run()}>
+                          <Show when={item.icon}>{(icon) => <Icon name={icon()} />}</Show>
+                          {item.title}
+                        </Menu.Item>
+                      )}
+                    </For>
+                  </Menu.Content>
+                </Menu.Portal>
+              </Menu>
+            </Show>
+          </div>
+        </Show>
         <ExtensionSlot
           at="session.panel.end"
           input={{
@@ -457,13 +538,52 @@ export function mountSessionRegion(input: { definitions: readonly Definition[]; 
 
   const dispose = render(
     () => (
-      <LanguageProvider locale="en">
+      <LanguageProvider locale={input.language ?? "en"}>
         <PlatformProvider value={web}>
           <DialogProvider>
             <RealHost
               definitions={input.definitions}
               captured={captured}
-              mounted={standIn({ current: () => (routed() ? view() : undefined), screen: () => screen })}
+              ipc={input.ipc}
+              mounted={standIn({
+                current: () => (routed() ? view() : undefined),
+                screen: () => screen,
+                layout: input.layout
+                  ? {
+                      ...input.layout,
+                      open: (key, session, options) => {
+                        input.layout?.open(key, session, options)
+
+                        if (!input.interactive) return
+                        setClosed((keys) => new Set([...keys].filter((entry) => entry !== key)))
+                        setActive(key)
+                      },
+                      toggle: (key, session) => {
+                        input.layout?.toggle(key, session)
+
+                        if (!input.interactive) return
+
+                        if (active() !== key) {
+                          setClosed((keys) => new Set([...keys].filter((entry) => entry !== key)))
+                          setActive(key)
+
+                          return
+                        }
+
+                        setClosed((keys) => new Set([...keys, key]))
+                        setActive(undefined)
+                      },
+                      state: (key, session) =>
+                        input.interactive
+                          ? closed().has(key)
+                            ? "closed"
+                            : active() === key
+                              ? "visible"
+                              : "open"
+                          : input.layout!.state(key, session),
+                    }
+                  : standIn({}).layout,
+              })}
             >
               <Region />
             </RealHost>
@@ -482,6 +602,10 @@ export function mountSessionRegion(input: { definitions: readonly Definition[]; 
     leave: () => setRouted(false),
     /** The session each composer attachment reached, in order. */
     attached,
+    notes,
+    setLanguage: (locale: "en" | "zh") => language.set?.(locale),
+    select: setActive,
+    links: (href: string, origin: string) => hosts[0]?.links.open({ href, origin, session: view() }),
     status: (id: string) => hosts[0]?.state.status[id],
     unmount: () => {
       dispose()

@@ -1,6 +1,6 @@
 import { batch } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
-import { Schema } from "effect"
+import { Exit, Schema } from "effect"
 import type { Ipc, IpcCallOptions, IpcClient, IpcSpec } from "@opencode/gui-extensions/sdk"
 import type { Bridge } from "@opencode/gui-extensions/sdk/bridge"
 
@@ -20,7 +20,10 @@ type IpcState = {
 }
 
 /** Renderer-side clients for the Ipcs that extensions provide in the main process. */
-export function createIpcClients(bridge: Bridge | undefined) {
+export function createIpcClients(
+  bridge: Bridge | undefined,
+  report?: (failure: { ipc: string; phase: "state" | "event" | "subscribe" }) => void,
+) {
   const [state, setState] = createStore<IpcState>({ available: {}, values: {}, generations: {} })
 
   const setAvailable = (id: string, available: boolean) => {
@@ -33,6 +36,8 @@ export function createIpcClients(bridge: Bridge | undefined) {
   const clients = new Map<string, IpcClient<IpcSpec>>()
   const listeners = new Map<string, Set<(name: string, data: Decoded) => void>>()
   const subscribed = new Set<string>()
+  const faults = new Set<string>()
+  const lifetime = { disposed: false }
   // How many availability and state events reached each Ipc. Events are newer than any snapshot, so a
   // subscribe reply only fills in what no event changed while it was in flight.
   const changes = new Map<string, { available: number; state: number }>()
@@ -49,10 +54,29 @@ export function createIpcClients(bridge: Bridge | undefined) {
     return created
   }
 
-  const decodeState = (id: string, value: Encoded): Decoded => {
-    const schema = specs.get(id)?.state
+  const failed = (ipc: string, phase: "state" | "event" | "subscribe") => {
+    if (lifetime.disposed) return
+    changesOf(ipc).state++
+    batch(() => {
+      setAvailable(ipc, false)
+      setState("values", ipc, undefined)
+    })
 
-    return schema ? Schema.decodeUnknownSync(schema)(value) : value
+    if (faults.has(ipc)) return
+    faults.add(ipc)
+    console.error("[extension IPC] Contract or subscription failed", { ipc, phase })
+    report?.({ ipc, phase })
+  }
+
+  const decodeState = (id: string, value: Encoded) => {
+    const schema = specs.get(id)?.state
+    const result = schema ? Schema.decodeUnknownExit(schema)(value) : Exit.succeed(value)
+
+    if (Exit.isFailure(result)) return failed(id, "state")
+
+    if (faults.delete(id)) setAvailable(id, true)
+
+    return { value: result.value }
   }
 
   const stop = bridge?.on((message) => {
@@ -60,7 +84,9 @@ export function createIpcClients(bridge: Bridge | undefined) {
       if (!specs.has(message.ipc)) return
 
       changesOf(message.ipc).state++
-      setState("values", message.ipc, reconcile(decodeState(message.ipc, message.state)))
+      const decoded = decodeState(message.ipc, message.state)
+
+      if (decoded) setState("values", message.ipc, reconcile(decoded.value))
 
       return
     }
@@ -85,9 +111,11 @@ export function createIpcClients(bridge: Bridge | undefined) {
     if (message.type !== "event") return
 
     const schema = specs.get(message.ipc)?.events?.[message.name]
-    const data = schema ? Schema.decodeUnknownSync(schema)(message.data) : message.data
+    const decoded = schema ? Schema.decodeUnknownExit(schema)(message.data) : Exit.succeed(message.data)
 
-    listeners.get(message.ipc)?.forEach((listener) => listener(message.name, data))
+    if (Exit.isFailure(decoded)) return failed(message.ipc, "event")
+
+    listeners.get(message.ipc)?.forEach((listener) => listener(message.name, decoded.value))
   })
 
   const subscribe = (connected: Bridge, token: Ipc) => {
@@ -98,16 +126,27 @@ export function createIpcClients(bridge: Bridge | undefined) {
 
     const before = { ...changesOf(token.id) }
 
-    void connected.subscribe(token.id).then((result) => {
-      const after = changesOf(token.id)
+    void connected
+      .subscribe(token.id)
+      .then((result) => {
+        if (lifetime.disposed) return
+        const after = changesOf(token.id)
 
-      batch(() => {
-        if (after.available === before.available) setAvailable(token.id, result.available)
+        batch(() => {
+          if (after.available === before.available) setAvailable(token.id, result.available)
 
-        if (after.state === before.state && result.state !== undefined)
-          setState("values", token.id, decodeState(token.id, result.state))
+          if (after.state === before.state && result.state !== undefined) {
+            const decoded = decodeState(token.id, result.state)
+
+            if (decoded) setState("values", token.id, decoded.value)
+          }
+        })
       })
-    })
+      .catch(() => {
+        const after = changesOf(token.id)
+
+        if (after.available === before.available && after.state === before.state) failed(token.id, "subscribe")
+      })
   }
 
   const create = (connected: Bridge, token: Ipc): IpcClient<IpcSpec> => {
@@ -174,6 +213,7 @@ export function createIpcClients(bridge: Bridge | undefined) {
       client(token) as IpcClient<S> | undefined,
     /** Stops listening to the bridge. Call it when the owner of these clients goes away. */
     dispose() {
+      lifetime.disposed = true
       stop?.()
     },
   }

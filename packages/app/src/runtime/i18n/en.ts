@@ -661,6 +661,8 @@ export const dict = {
   "settings.guiExtensions.status.loading": "Loading",
   "settings.guiExtensions.status.active": "Active",
   "settings.guiExtensions.status.failed": "Failed",
+  "settings.guiExtensions.ipcFailed":
+    "Could not read data from desktop extension {{ipc}}. Check the extension in Settings.",
   "settings.guiExtensions.status.disabled": "Disabled",
   "settings.guiExtensions.status.blocked": "Blocked",
   "settings.tab.about": "About",

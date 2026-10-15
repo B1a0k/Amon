@@ -1,4 +1,5 @@
 import type { Component, Owner } from "solid-js"
+import { readFile } from "node:fs/promises"
 import type {
   Context,
   Contract,
@@ -23,9 +24,17 @@ type Kept = { ctx?: Context }
 /** What the pre-mount case reads from inside its extension's setup. */
 type Reads = { state?: () => string; font?: () => string; prefs?: { value?: { count: number }; ready(): boolean } }
 
-story.beforeEach(async ({ mount }) => {
+story.beforeEach(async ({ mount, page }) => {
   // Any story loads the app; the fixture mounts the real host beside it.
   await mount("ui-line-comment--editor")
+  // Vite can reload while optimizing a first-use native UI dependency. Warm imports before any host mutation.
+  await expect(() =>
+    page.evaluate(async (path) => {
+      await import(path)
+    }, fixture),
+  ).toPass({ timeout: 30000 })
+  await page.reload()
+  await expect(page.getByRole("textbox", { name: "Add context for this change", exact: true })).toBeVisible()
 })
 
 story("an extension that finishes loading after the host unmounts is never set up", async ({ page }) => {
@@ -1003,7 +1012,9 @@ story("startup enable state does not wait for the manager, and live updates beat
 
       const failed = mountExtensions({
         bridge: { ...bridge, manager: { ...bridge.manager, initial, list: () => reply.promise } },
-        definitions: [{ id: "disabled", renderer: async () => ({ default: () => void setups.push("wrongly enabled") }) }],
+        definitions: [
+          { id: "disabled", renderer: async () => ({ default: () => void setups.push("wrongly enabled") }) },
+        ],
       })
 
       await new Promise((resolve) => setTimeout(resolve, 50))
@@ -1049,5 +1060,559 @@ story("startup enable state does not wait for the manager, and live updates beat
     ],
     updated: { setups: ["enabled", "disabled", "dependent"], status: ["disabled", "active", "active"] },
     listeners: 0,
+  })
+})
+
+story.describe("operation workspace", () => {
+  story.describe.configure({ mode: "serial" })
+
+  story(
+    "situation workspace follows sessions, opens from its header and navigates grouped facts",
+    async ({ page }, testInfo) => {
+      // Warm first-use Vite dependencies before mounting a stateful fixture, then enter a fresh document.
+      await expect(() =>
+        page.evaluate(
+          async (paths) => {
+            await Promise.all(paths.map((path) => import(path)))
+          },
+          [
+            sourceURL(new URL("./operation.fixture.tsx", import.meta.url)),
+            sourceURL(new URL("../../gui-extensions/src/operation/workspace.tsx", import.meta.url)),
+          ],
+        ),
+      ).toPass({ timeout: 30000 })
+      await page.reload()
+      await expect(page.getByRole("textbox", { name: "Add context for this change", exact: true })).toBeVisible()
+
+      const document = (sessionID: string) => ({
+        schemaVersion: 1,
+        boards: [],
+        nodes: [],
+        edges: [],
+        cards: [],
+        tables: [],
+        operation: {
+          schemaVersion: 2,
+          engagementId: sessionID,
+          revision: 1,
+          services: [],
+          surfaces: [],
+          credentials: [],
+          access: [],
+          findings: [],
+          hypotheses: [],
+          attempts: [],
+          evidence: [],
+          changes: [],
+          relations: [],
+          assets: Array.from({ length: sessionID === "ses_a" ? 1200 : 1 }, (_, index) => ({
+            id: `host/${index}`,
+            displayName: sessionID === "ses_a" ? `Host ${index}` : "Independent B host",
+            kind: "host",
+            state: "observed",
+            evidence: [],
+            createdAt: 1,
+            updatedAt: 1,
+            scopeId: index < 600 ? "Organization A" : "Organization B",
+            identifiers: [{ kind: "ip", value: `10.1.${Math.floor(index / 256)}.${index % 256}` }],
+          })),
+        },
+      })
+
+      await page.route("**/api/session/*/operation", (route) => {
+        const sessionID = new URL(route.request().url()).pathname.split("/")[3]
+
+        return route.fulfill({ json: { data: document(sessionID) } })
+      })
+      await page.route("**/api/session/*/operation/audit*", (route) =>
+        route.fulfill({ json: { data: { records: [] } } }),
+      )
+      await page.evaluate(
+        async (path) => {
+          const { mountOperation } = await import(path)
+          const host = mountOperation()
+          // Keep teardown owned by the synthetic fixture, never a live app or model.
+          Object.assign(window, { operationHost: host })
+        },
+        sourceURL(new URL("./operation.fixture.tsx", import.meta.url)),
+      )
+      const workspace = page.getByLabel("Operation test workspace")
+      await expect(workspace.getByRole("button", { name: "Organization A · 600 records", exact: true })).toBeVisible()
+      await expect(workspace.getByRole("button", { name: "Organization B · 600 records", exact: true })).toBeVisible()
+      await workspace.getByRole("button", { name: "Open situation workspace", exact: true }).click()
+      await expect(workspace.getByLabel("Search records and relationships")).toHaveCount(0)
+      await workspace.getByRole("button", { name: "Add panel", exact: true }).click()
+      await page.getByRole("menuitem", { name: "Situation", exact: true }).click()
+      // SAFETY: mountOperation above installs this handle and the typed members used by this isolated fixture.
+      await expect.poll(() => page.evaluate(() => window.operationHost!.writes)).toEqual(["ses_a", "ses_a"])
+      const group = workspace.getByRole("button", { name: "Organization A · 600 records", exact: true })
+      await group.focus()
+
+      const refreshed = page.waitForResponse(
+        (reply) => reply.url().endsWith("/api/session/ses_a/operation") && reply.status() === 200,
+      )
+
+      await page.evaluate(() => window.operationHost!.refresh("ses_a"))
+      await refreshed
+      await expect(group).toBeFocused()
+      await workspace.getByRole("button", { name: "Organization A · 600 records", exact: true }).click()
+      await expect(workspace.getByRole("button", { name: "Collapse groups", exact: true })).toBeVisible()
+      await workspace.getByRole("button", { name: "Search records and relationships", exact: true }).click()
+      await workspace.getByRole("textbox", { name: "Search records and relationships", exact: true }).fill("Host 599")
+      await workspace.getByRole("button", { name: "Host 599", exact: true }).click()
+      await expect(workspace.getByRole("button", { name: "Close details", exact: true })).toBeVisible()
+      await expect(workspace.getByRole("tab", { name: "Assets", exact: true })).toHaveAttribute("aria-selected", "true")
+      await workspace.getByRole("button", { name: "Session b", exact: true }).click()
+      await expect(workspace.getByRole("button", { name: "Independent B host", exact: true })).toBeVisible()
+      await expect(workspace.getByRole("button", { name: "Close details", exact: true })).toHaveCount(0)
+      await expect(
+        workspace.getByRole("textbox", { name: "Search records and relationships", exact: true }),
+      ).toHaveCount(0)
+      await workspace.getByRole("button", { name: "Session a", exact: true }).click()
+      await expect(workspace.getByRole("tab", { name: "Assets", exact: true })).toHaveAttribute("aria-selected", "true")
+      await workspace.getByRole("tab", { name: "Overview", exact: true }).click()
+      await expect(workspace.getByRole("button", { name: "Organization A · 600 records", exact: true })).toBeVisible()
+      await workspace.screenshot({ path: testInfo.outputPath("operation-1200-nodes.png") })
+      // SAFETY: mountOperation above installs the teardown handle for this isolated fixture.
+      await page.evaluate(() => window.operationHost!.unmount())
+      // SAFETY: mountOperation above installs this handle and the typed members used by this isolated fixture.
+      await expect.poll(() => page.evaluate(() => window.operationHost!.listeners.size)).toBe(0)
+    },
+  )
+
+  story(
+    "situation workspace renders authored links and copies complete credentials on a narrow screen",
+    async ({ page }, testInfo) => {
+      await expect(() =>
+        page.evaluate(
+          async (paths) => {
+            await Promise.all(paths.map((path) => import(path)))
+          },
+          [
+            sourceURL(new URL("./operation.fixture.tsx", import.meta.url)),
+            sourceURL(new URL("../../gui-extensions/src/operation/workspace.tsx", import.meta.url)),
+          ],
+        ),
+      ).toPass({ timeout: 30000 })
+      await page.reload()
+      await expect(page.getByRole("textbox", { name: "Add context for this change", exact: true })).toBeVisible()
+      await page.setViewportSize({ width: 420, height: 780 })
+      await page.context().grantPermissions(["clipboard-read", "clipboard-write"])
+      const secret = "  original...literal-" + "a".repeat(12000) + "\nCOMPLETE-END  "
+      const base = { evidence: ["probe"], createdAt: 1, updatedAt: 1 }
+      await page.route("**/api/session/*/operation", (route) =>
+        route.fulfill({
+          json: {
+            data: {
+              schemaVersion: 1,
+              boards: [{ id: "main", title: "Main path" }],
+              nodes: [
+                {
+                  id: "entry",
+                  board: "main",
+                  title: "Entry host",
+                  kind: "host",
+                  detail: "Complete discovery details",
+                  highlight: false,
+                  entityType: "asset",
+                  entityId: "entry",
+                },
+                {
+                  id: "next",
+                  board: "main",
+                  title: "Next check",
+                  kind: "hypothesis",
+                  detail: "Keep the original branch checkpoint",
+                  highlight: true,
+                },
+              ],
+              edges: [
+                {
+                  id: "direction",
+                  board: "main",
+                  from: "entry",
+                  to: "next",
+                  label: "Scoped observation",
+                  proven: false,
+                  line: "dashed",
+                  path: "elbow",
+                },
+              ],
+              cards: [
+                {
+                  id: "note",
+                  board: "main",
+                  title: "Checkpoint note",
+                  body: "Keep original authored explanation",
+                  tone: "neutral",
+                },
+              ],
+              tables: [
+                {
+                  id: "table",
+                  board: "main",
+                  title: "Original table",
+                  columns: ["Observation"],
+                  rows: [{ id: "row", cells: ["Original table value"] }],
+                },
+              ],
+              operation: {
+                schemaVersion: 2,
+                engagementId: "ses_a",
+                revision: 1,
+                assets: [
+                  {
+                    ...base,
+                    id: "entry",
+                    kind: "host",
+                    displayName: "Entry host",
+                    identifiers: [{ kind: "ip", value: "10.1.1.1" }],
+                    state: "observed",
+                  },
+                ],
+                services: [],
+                surfaces: [],
+                credentials: [
+                  {
+                    ...base,
+                    id: "cred",
+                    principal: "operator",
+                    realm: "",
+                    kind: "token",
+                    source: "probe",
+                    validFor: ["asset/entry"],
+                    state: "unverified",
+                    fingerprint: "synthetic",
+                  },
+                ],
+                access: [],
+                findings: [],
+                hypotheses: [],
+                attempts: [],
+                evidence: [],
+                changes: [],
+                relations: [],
+              },
+            },
+          },
+        }),
+      )
+      await page.route("**/api/session/*/operation/credential/cred", (route) =>
+        route.fulfill({ json: { data: { secret } } }),
+      )
+      await page.evaluate(
+        async (path) => {
+          const { mountOperation } = await import(path)
+          window.operationHost = mountOperation()
+        },
+        sourceURL(new URL("./operation.fixture.tsx", import.meta.url)),
+      )
+      const workspace = page.getByLabel("Operation test workspace")
+      await expect(workspace.getByRole("button", { name: "Next check", exact: true })).toBeVisible()
+      await workspace.getByRole("button", { name: "Next check", exact: true }).click()
+      await expect(workspace.getByRole("tab", { name: "Test paths", exact: true })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      )
+      await expect(workspace.getByRole("button", { name: "Model diagram", exact: true })).toHaveCount(0)
+      await expect(
+        workspace
+          .locator("section")
+          .filter({ has: page.getByRole("button", { name: "Close details", exact: true }) })
+          .getByText("Keep the original branch checkpoint", { exact: true }),
+      ).toBeVisible()
+      await expect(
+        workspace.getByRole("img", { name: "Graph", exact: true }).locator("path.op-edge.line-dashed"),
+      ).toHaveCount(1)
+
+      const stroke = await workspace
+        .getByRole("img", { name: "Graph", exact: true })
+        .locator("path.op-edge.line-dashed")
+        .evaluate((node) => getComputedStyle(node).stroke)
+
+      expect(stroke).not.toBe("none")
+      await workspace.getByText("Supporting notes and tables", { exact: true }).click()
+      await expect(workspace.getByText("Keep original authored explanation", { exact: true })).toBeVisible()
+      await expect(workspace.getByText("Original table value", { exact: true })).toBeVisible()
+      await workspace.screenshot({ path: testInfo.outputPath("operation-narrow-diagram.png") })
+      await workspace.getByRole("tab", { name: "Assets", exact: true }).click()
+      await workspace.getByRole("button", { name: "Reveal", exact: true }).click()
+      await expect(workspace.getByRole("button", { name: "Copy", exact: true })).toBeEnabled()
+      await workspace.getByRole("button", { name: "Copy", exact: true }).click()
+      await expect(workspace.getByRole("button", { name: "Copied", exact: true })).toBeVisible()
+      // Windows CF_UNICODETEXT uses CRLF; retain all literal bytes except the platform line ending.
+      expect((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n")).toBe(secret)
+      expect(await workspace.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
+      await page.evaluate(() => window.operationHost!.unmount())
+    },
+  )
+
+  story(
+    "situation workspace uses native Chinese, keeps adjacent panels independent and attaches record references",
+    async ({ page, mount }, testInfo) => {
+      await mount("ui-line-comment--editor", { globals: { theme: "dark" } })
+      await expect(() =>
+        page.evaluate(
+          async (paths) => {
+            await Promise.all(paths.map((path) => import(path)))
+          },
+          [
+            sourceURL(new URL("./operation.fixture.tsx", import.meta.url)),
+            sourceURL(new URL("../../gui-extensions/src/operation/workspace.tsx", import.meta.url)),
+          ],
+        ),
+      ).toPass({ timeout: 30000 })
+      await page.reload()
+      await expect(page.getByRole("textbox", { name: "Add context for this change", exact: true })).toBeVisible()
+      const base = { evidence: ["probe"], createdAt: 1, updatedAt: 1 }
+      await page.route("**/api/session/*/operation", (route) =>
+        route.fulfill({
+          json: {
+            data: {
+              schemaVersion: 1,
+              boards: [],
+              nodes: [],
+              edges: [],
+              cards: [],
+              tables: [],
+              operation: {
+                schemaVersion: 2,
+                engagementId: "ses_a",
+                revision: 4,
+                assets: [
+                  {
+                    ...base,
+                    id: "operator",
+                    displayName: "操作主机",
+                    kind: "host",
+                    state: "confirmed",
+                    identifiers: [{ kind: "ip", value: "10.10.16.47" }],
+                    scopeId: "实验环境",
+                  },
+                  {
+                    ...base,
+                    id: "mail",
+                    displayName: "mail.painters.test",
+                    kind: "host",
+                    state: "confirmed",
+                    identifiers: [{ kind: "ip", value: "192.168.110.51" }],
+                    scopeId: "实验环境",
+                  },
+                  {
+                    ...base,
+                    id: "dc",
+                    displayName: "DC.painters.test",
+                    kind: "host",
+                    state: "observed",
+                    identifiers: [{ kind: "ip", value: "192.168.110.55" }],
+                    scopeId: "实验环境",
+                  },
+                ],
+                services: [
+                  {
+                    ...base,
+                    id: "ssh",
+                    assetId: "mail",
+                    port: 22,
+                    transport: "tcp",
+                    name: "ssh",
+                    product: "OpenSSH",
+                    version: "8.2",
+                    state: "confirmed",
+                  },
+                ],
+                access: [
+                  {
+                    ...base,
+                    id: "shell",
+                    assetId: "mail",
+                    kind: "ssh",
+                    identity: "riley",
+                    privilege: "user",
+                    state: "active",
+                  },
+                ],
+                findings: [
+                  {
+                    ...base,
+                    id: "finding",
+                    assetId: "dc",
+                    title: "待验证的权限配置",
+                    vulnerabilityClass: "configuration",
+                    severity: "high",
+                    confidence: 0.6,
+                    impact: "待验证",
+                    reproduction: [],
+                    state: "candidate",
+                  },
+                ],
+                relations: [
+                  {
+                    ...base,
+                    id: "vpn",
+                    from: "asset/operator",
+                    to: "asset/mail",
+                    kind: "connects_to",
+                    state: "confirmed",
+                    rationale: "TCP/22 握手完成",
+                  },
+                  {
+                    ...base,
+                    id: "pivot",
+                    from: "asset/mail",
+                    to: "asset/dc",
+                    kind: "pivots_to",
+                    state: "observed",
+                    rationale: "隧道下有观测证据，仍需验证",
+                  },
+                ],
+                surfaces: [],
+                credentials: [],
+                hypotheses: [],
+                attempts: [],
+                evidence: [],
+                changes: [],
+              },
+            },
+          },
+        }),
+      )
+      await page.evaluate(
+        async (path) => {
+          const { mountOperation } = await import(path)
+          window.operationHost = mountOperation({ language: "zh", neighbors: true })
+        },
+        sourceURL(new URL("./operation.fixture.tsx", import.meta.url)),
+      )
+      const workspace = page.getByLabel("Operation test workspace")
+      await expect(workspace.getByRole("tab", { name: "总览", exact: true })).toBeVisible()
+      await expect(workspace.getByRole("button", { name: "模型绘图", exact: true })).toHaveCount(0)
+
+      const font = await workspace
+        .getByRole("tab", { name: "总览", exact: true })
+        .evaluate((element) => getComputedStyle(element).fontFamily)
+
+      await expect(workspace.locator(".op-node-title").first()).toHaveCSS("font-family", font)
+
+      const original = await page.evaluate(() => {
+        const value = document.documentElement.style.getPropertyValue("--font-family-sans")
+        document.documentElement.style.setProperty("--font-family-sans", "monospace")
+
+        return value
+      })
+
+      await expect(workspace.locator(".op-node-title").first()).toHaveCSS("font-family", "monospace")
+      await expect(workspace.getByRole("tab", { name: "总览", exact: true })).toHaveCSS("font-family", "monospace")
+      await page.evaluate((value) => document.documentElement.style.setProperty("--font-family-sans", value), original)
+      await expect(workspace.getByRole("button", { name: "打开战情", exact: true }).locator("svg")).toBeVisible()
+      await expect(workspace.getByRole("button", { name: "打开战情", exact: true }).locator("use")).toHaveAttribute(
+        "href",
+        /radar/,
+      )
+      await expect(workspace.locator(".op-workspace")).toHaveCSS("display", "flex")
+      await expect(workspace.locator(".op-node-star")).toHaveText("★")
+      await expect(workspace.locator(".op-edge-label").filter({ hasText: "可达" })).toHaveCount(1)
+      await expect(workspace.getByText("branch-out", { exact: true })).toHaveCount(0)
+      const own = await workspace.getByRole("button", { name: "打开战情", exact: true }).boundingBox()
+      const neighbor = await workspace.getByRole("button", { name: "Neighbor panel", exact: true }).boundingBox()
+      expect(own).not.toBeNull()
+      expect(neighbor).not.toBeNull()
+      expect(neighbor!.x + neighbor!.width).toBeLessThanOrEqual(own!.x)
+      await workspace.getByRole("button", { name: "Neighbor panel", exact: true }).click()
+      await expect(workspace.getByRole("region", { name: "Neighbor content", exact: true })).toBeVisible()
+      await expect(workspace.locator(".op-workspace")).toHaveCount(0)
+      await workspace.getByRole("button", { name: "Add panel", exact: true }).click()
+      await page.getByRole("menuitem", { name: "战情", exact: true }).click()
+      await expect(workspace.getByRole("button", { name: "mail.painters.test", exact: true })).toBeVisible()
+      await expect(workspace.getByRole("button", { name: "更多操作", exact: true }).locator("use")).toHaveAttribute(
+        "href",
+        /outline-dots/,
+      )
+      await workspace.screenshot({ path: testInfo.outputPath("operation-native-dark.png") })
+      await workspace.getByRole("button", { name: "mail.painters.test", exact: true }).click()
+      await workspace.getByRole("button", { name: "添加到对话", exact: true }).click()
+      await expect.poll(() => page.evaluate(() => window.operationHost!.attached)).toEqual(["ses_a"])
+      expect(await page.evaluate(() => window.operationHost!.notes[0].href)).toBe("asset/mail")
+      await workspace.getByRole("button", { name: "Neighbor panel", exact: true }).click()
+      await page.evaluate(() => {
+        const note = window.operationHost!.notes[0]
+        window.operationHost!.links(note.href!, note.origin)
+      })
+      await expect(workspace.getByRole("button", { name: "关闭详情", exact: true })).toBeVisible()
+      await expect(workspace.getByRole("tab", { name: "资产画像", exact: true })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      )
+      const saving = page.waitForEvent("download")
+      await workspace.getByRole("button", { name: "更多操作", exact: true }).click()
+      await page.getByRole("menuitem", { name: "导出战情", exact: true }).click()
+      const saved = await saving
+      expect(saved.suggestedFilename()).toBe("situation-ses_a.json")
+      const exported = testInfo.outputPath("operation-export.json")
+      await saved.saveAs(exported)
+      expect(await readFile(exported, "utf-8")).toContain('"engagementId": "ses_a"')
+      await workspace.getByRole("button", { name: "更多操作", exact: true }).click()
+      await expect(page.getByRole("menuitem", { name: "已导出", exact: true })).toBeVisible()
+      await page.keyboard.press("Escape")
+      await page.evaluate(() => window.operationHost!.setLanguage("en"))
+      await expect(workspace.getByRole("tab", { name: "Assets", exact: true })).toBeVisible()
+      await expect(workspace.getByRole("button", { name: "Open situation workspace", exact: true })).toBeVisible()
+      await page.evaluate(() => window.operationHost!.setLanguage("zh"))
+      await expect(workspace.getByRole("tab", { name: "资产画像", exact: true })).toBeVisible()
+      await page.evaluate(() => window.operationHost!.unmount())
+    },
+  )
+
+  story("situation workspace reports unavailable data and retries into a restrained empty state", async ({ page }) => {
+    const response = { unavailable: true }
+    await page.route("**/api/session/*/operation", (route) =>
+      response.unavailable
+        ? route.fulfill({ status: 503, json: { error: "Synthetic disconnected route" } })
+        : route.fulfill({
+            json: {
+              data: {
+                schemaVersion: 1,
+                boards: [],
+                nodes: [],
+                edges: [],
+                cards: [],
+                tables: [],
+                operation: {
+                  schemaVersion: 2,
+                  engagementId: "ses_a",
+                  revision: 0,
+                  assets: [],
+                  services: [],
+                  surfaces: [],
+                  credentials: [],
+                  access: [],
+                  findings: [],
+                  hypotheses: [],
+                  attempts: [],
+                  evidence: [],
+                  changes: [],
+                  relations: [],
+                },
+              },
+            },
+          }),
+    )
+    await page.evaluate(
+      async (path) => {
+        const { mountOperation } = await import(path)
+        window.operationHost = mountOperation({ language: "zh" })
+      },
+      sourceURL(new URL("./operation.fixture.tsx", import.meta.url)),
+    )
+    const workspace = page.getByLabel("Operation test workspace")
+    await expect(workspace.getByRole("alert")).toContainText("战情暂时不可用")
+    await expect(workspace.getByText("尚无战情记录", { exact: true })).toHaveCount(0)
+    response.unavailable = false
+    await workspace.getByRole("button", { name: "刷新", exact: true }).click()
+    await expect(workspace.getByText("尚无战情记录", { exact: true })).toBeVisible()
+    await expect(workspace.getByRole("alert")).toHaveCount(0)
+    await expect(workspace.getByLabel("查找节点与关系", { exact: true })).toHaveCount(0)
+    await expect(workspace.getByRole("img", { name: "关系图", exact: true })).toHaveCount(0)
+    await page.evaluate(() => window.operationHost!.unmount())
   })
 })

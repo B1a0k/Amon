@@ -22,6 +22,7 @@ import {
 import { createStore } from "solid-js/store"
 import { createKeyed, useDrawer, useExtension, type MountedSession } from "../sdk"
 import { configuredLsps } from "./configured-lsp"
+import { Integration } from "./contract"
 
 const services = [
   { type: "mcp", icon: "mcp", label: "mcp" },
@@ -95,6 +96,9 @@ export function SessionServerPanel(props: {
                   onOpenChange={(value) => setSubmenu(value ? { scope: scope(), service: service.type } : undefined)}
                 />
               )}
+            </For>
+            <For each={ctx.list(Integration).toSorted((a, b) => a.order - b.order)}>
+              {(item) => <item.Row session={props.session} shown={props.shown} />}
             </For>
           </div>
         )}

@@ -24,6 +24,8 @@ import { Plugin } from "./plugin.js"
 import { Project } from "./project.js"
 import { Provider } from "./provider.js"
 import { Worktree } from "./worktree.js"
+import { Operation } from "./operation.js"
+import { BeaconPass } from "./beaconpass.js"
 import { Pty } from "./pty.js"
 import { Reference } from "./reference.js"
 import { ServerEvent } from "./server-event.js"
@@ -52,6 +54,8 @@ const foundationDefinitions = Event.inventory(
 )
 
 const featureDefinitions = Event.inventory(
+  BeaconPass.Updated,
+  Operation.Updated,
   ...FileSystem.Event.Definitions,
   ...Reference.Event.Definitions,
   ...Permission.Event.Definitions,

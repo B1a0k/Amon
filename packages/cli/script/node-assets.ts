@@ -26,6 +26,10 @@ export async function collectNodeAssets(target: NodeTarget) {
   const ptyEntry = fileURLToPath(import.meta.resolve(target.nodePtyPackage))
   const ptyRoot = path.resolve(path.dirname(ptyEntry), "..")
   const assets: NodeAsset[] = [
+    {
+      key: target.amonNativeAsset,
+      source: path.resolve(dir, "../amon-native/prebuilds", path.basename(target.amonNativeAsset)),
+    },
     { key: target.parcelWatcherAsset, source: fileURLToPath(import.meta.resolve(target.parcelWatcherPackage)) },
     { key: target.fffAsset, source: fileURLToPath(import.meta.resolve(target.fffPackage)) },
     { key: target.fffFfiAsset, source: fileURLToPath(import.meta.resolve(target.fffFfiPackage)) },

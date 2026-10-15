@@ -39,3 +39,6 @@ export { Workspace } from "./workspace.js"
 export { Prompt, PromptMention, FileSource, FileAttachment, AgentAttachment } from "./prompt.js"
 export { PromptInput } from "./prompt-input.js"
 export * from "./schema.js"
+
+export { Operation } from "./operation.js"
+export { BeaconPass } from "./beaconpass.js"

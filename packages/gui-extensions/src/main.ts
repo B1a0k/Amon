@@ -1,5 +1,8 @@
 import { Extension } from "./sdk/main"
 import context from "./context"
+import operation from "./operation"
+import beaconpass from "./beaconpass"
+import cobaltelectron from "./cobaltelectron"
 import btw from "./btw"
 import debug from "./debug"
 import terminal from "./terminal"
@@ -19,6 +22,9 @@ import microsoftOffice from "./microsoft-office"
  */
 export const builtins = Extension.compose(
   context,
+  operation,
+  beaconpass,
+  { ...cobaltelectron, main: () => import("./cobaltelectron/main") },
   btw,
   debug,
   terminal,
